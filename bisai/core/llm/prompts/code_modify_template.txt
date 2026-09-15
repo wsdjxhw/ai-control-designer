@@ -1,0 +1,75 @@
+# ============================================
+# 代码修改通用模板（跨领域版 v4 - 带场景上下文）
+# ============================================
+
+You are an expert in control theory and scientific computing.
+Below are the scene context, evolutionary history, current control law code,
+and diagnostic report. Please modify the code to generate a new version.
+
+===== SCENE CONTEXT (HIGHEST PRIORITY) =====
+{{scene_context}}
+
+===== EVOLUTIONARY HISTORY SUMMARY =====
+{{history_summary}}
+
+===== CURRENT CONTROL LAW CODE (READ CAREFULLY) =====
+{{current_code}}
+
+===== DIAGNOSTIC REPORT =====
+{{diagnosis_report}}
+
+===== EXISTING CODE CONTEXT (MUST PRESERVE) =====
+
+Before writing the new version, carefully analyze the current control law above.
+
+[1] RETURN SHAPE
+The SCENE CONTEXT section specifies EXACTLY how many columns the return value
+must have. Follow that number, NOT what you see in the current code (the current
+code may be buggy).
+
+[2] CONTROL TYPE (CRITICAL)
+The SCENE CONTEXT section specifies the control type (continuous or bang-bang).
+Follow that. Do NOT switch types unless the diagnostic report explicitly says to.
+
+[3] PARAMETER NAMING CONVENTION
+Preserve existing parameter names: gain_theta, gain_omega, kp, kd, max_torque, etc.
+Only add new names when genuinely needed.
+Do NOT rename existing parameters without strong reason.
+
+[4] SIMULATION CONSTANTS
+Do NOT hardcode T, dt, or any other simulation constant.
+Use the values from SCENE CONTEXT.
+
+===== MODIFICATION REQUIREMENTS =====
+
+1. Read the history summary carefully to avoid repeating failed modifications.
+2. If a parameter was adjusted multiple times without resolving the issue,
+   consider changing the control law STRUCTURE instead.
+3. Prefer structural combinations of existing parameters over blindly adding new ones.
+4. Explain in code comments how this modification avoids past failures.
+5. Your new code MUST be consistent with the SCENE CONTEXT section.
+
+===== VECTORIZATION SAFETY (HIGHEST PRIORITY) =====
+{{vectorization_rules}}
+
+===== PARAMETER DECLARATION BLOCK (REQUIRED) =====
+
+Immediately after the self-check comment block, before the control_law function,
+include a block exactly like this (use # comments, NOT a code block):
+
+# ========== PARAM DECLARATION ==========
+# @param: param_1 (0.1, 10.0)
+# @param: param_2 (0.5, 8.0)
+# @param: param_3 (-2.0, 2.0)
+# ========== END PARAM DECLARATION ==========
+
+List EVERY tunable parameter used in your control law.
+THIS BLOCK IS MANDATORY.
+
+===== OUTPUT FORMAT HARD REQUIREMENTS =====
+
+- Output ONLY the complete Python code.
+- Must include "import numpy as np" and the "control_law" function definition.
+- The self-check comment block must be at the top.
+- Do NOT output any explanatory text outside the code.
+- Return shape and control type MUST match SCENE CONTEXT.

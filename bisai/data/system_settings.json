@@ -1,0 +1,21 @@
+{
+  "llm": {
+    "model": "Qwen/Qwen3.5-27B",
+    "api_key": "ms-0f426213-6731-4a9b-b225-b3b359b48309",
+    "base_url": "https://api-inference.modelscope.cn/v1",
+    "temperature": 0.0,
+    "max_retries": 30
+  },
+  "optimizer_defaults": {
+    "type": "pso",
+    "trials": 1000,
+    "seed": 42
+  },
+  "max_iterations": 20,
+  "llm_model": "gpt-5",
+  "llm_base_url": "https://api.catcat.top/v1",
+  "llm_api_key": "sk-7Xe4aiPRs9W1ETTxPly1iqEm08kpLaH5isV2DMLMBzuVK55i",
+  "llm_temperature": 0.0,
+  "llm_timeout": 250,
+  "optimizer_type": "tpe"
+}

@@ -1,0 +1,35 @@
+{
+  "domain_name": "generic_system",
+  "model_type": "generic_ode",
+  "state_names": [
+    "x1",
+    "x2"
+  ],
+  "control_names": [
+    "u1"
+  ],
+  "target_values": {
+    "x1": 1.0,
+    "x2": 0.0
+  },
+  "physical_params": {
+    "a": 1.0,
+    "b": 1.0
+  },
+  "control_type": "continuous",
+  "control_limits": {
+    "u1": [
+      -10.0,
+      10.0
+    ]
+  },
+  "temporal": {
+    "T": 10.0,
+    "dt": 0.01
+  },
+  "initial_state": {
+    "x1": 0.0,
+    "x2": 0.0
+  },
+  "_model_code": "import numpy as np\nfrom core.base.base_model import BaseModel\n\nclass GenericModel(BaseModel):\n    def __init__(self, scene_config):\n        params = scene_config.get(\"physical_params\", {})\n        self.a = params.get(\"a\", 1.0)\n        self.b = params.get(\"b\", 1.0)\n\n    def get_initial_state(self, x_grid=None):\n        init = scene_config.get(\"initial_state\", {})\n        state_names = scene_config.get(\"state_names\", [\"x1\", \"x2\"])\n        return np.array([\n            init.get(f\"{name}0\", 0.0) for name in state_names\n        ])\n\n    def rhs(self, t, state, control, x_grid=None):\n        state_names = scene_config.get(\"state_names\", [\"x1\", \"x2\"])\n        x1, x2 = state\n        u = control[0] if len(control) > 0 else 0.0\n        dx1 = x2\n        dx2 = -self.a * x1 + self.b * u\n        return np.array([dx1, dx2])\n\n    def validate_state(self, state):\n        return True"
+}

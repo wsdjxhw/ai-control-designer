@@ -1,0 +1,14 @@
+===== V1 演化诊断报告 =====
+本轮代价: 1.718351
+## System Automatic Diagnosis (LLM service temporarily unavailable)
+
+**Current Metrics**:
+=== Evolution Metrics ===
+  State theta: final_mean=0.2978, final_dev=0.2978, max_dev=0.5000, integrated_dev=0.7800
+  State omega: final_mean=0.0000, final_dev=0.0000, max_dev=0.0000, integrated_dev=0.0000
+  Control torque: mean=-0.3120, total=-1.5600
+
+**Structural Modification Suggestions**:
+- Check if parameters are hitting bounds; consider adjusting parameter ranges.
+
+**Error**: LLM 调用失败: Error code: 429

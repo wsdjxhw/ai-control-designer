@@ -1,0 +1,113 @@
+[
+  {
+    "version": 1,
+    "timestamp": "2026-09-15T15:51:51.000656",
+    "params": {
+      "theta_gain": 0.7971827592063286,
+      "torque_limit": 28.644278108836744,
+      "omega_gain": 46.23287238004048
+    },
+    "cost": 1.7183506258988497,
+    "param_count": 3,
+    "diagnosis_summary": "我可以按这个模板生成诊断报告，但当前输入里**没有提供 Evolution History（演化历史）内容**，只有当前版本指标：\n\n- θ:\n  - final_mean = 0.2978\n  - final_dev = 0.2978\n  - max_dev = 0.5000\n  - integrated_dev = 0.7800\n- ω:\n  - final_mean = 0\n  - final_dev = 0\n  - max_dev = 0\n  - integrated_dev = 0\n- Control torque:\n  - mean = -0.3121\n  - total = -1.5603\n\n因此以下部分无法可靠完成：\n- 参数跨版本符号翻转分析\n- 历史修改有效性分类\n- 重复失败模式分析\n- 成功策略提取\n- 当前问题与历史版本对照表\n\n如果直接生成，会不可避免地编造版本信息。\n\n请补充：\n\n```\n=== 演化历史 (完整) ===\nVersion 1:\n- params:\n- cost:\n- theta deviation:\n- omega deviation:\n",
+    "metrics": {
+      "state_stats": {
+        "theta": {
+          "final_mean": 0.2978351343308445,
+          "final_deviation": 0.2978351343308445,
+          "max_deviation": 0.5,
+          "integrated": 0.7800079744137343
+        },
+        "omega": {
+          "final_mean": 0.0,
+          "final_deviation": 0.0,
+          "max_deviation": 0.0,
+          "integrated": 0.0
+        }
+      },
+      "control_stats": {
+        "torque": {
+          "mean_usage": -0.3120853321762714,
+          "max_usage": -0.23792672539114756,
+          "total_integrated": -1.560303186474939
+        }
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "version": 2,
+    "timestamp": "2026-09-15T15:52:47.239577",
+    "params": {
+      "theta_gain": 52.12086608940979,
+      "nonlinear_gain": 86.94987926267864,
+      "torque_limit": 0.31626696209886274,
+      "omega_gain": 41.76880585466783
+    },
+    "cost": 1.7179663795860254,
+    "param_count": 4,
+    "diagnosis_summary": "# 1. Executive Summary\n\n**Single most critical issue:** The optimization has only one recorded version, but the dominant failure mode is already clear: **the controller fails to reduce the θ-state deviation, which remains large and persistent (`final_dev=0.2974`, `max_dev=0.5000`, `integrated_dev=0.7818`) while ω is perfectly regulated.**\n\nImpact: **θ contributes essentially all observable state error (100% of state deviation cost in the provided metrics), indicating the current control law succ",
+    "metrics": {
+      "state_stats": {
+        "theta": {
+          "final_mean": 0.29741139796626254,
+          "final_deviation": 0.29741139796626254,
+          "max_deviation": 0.5,
+          "integrated": 0.7818031229223403
+        },
+        "omega": {
+          "final_mean": 0.0,
+          "final_deviation": 0.0,
+          "max_deviation": 0.0,
+          "integrated": 0.0
+        }
+      },
+      "control_stats": {
+        "torque": {
+          "mean_usage": -0.3162669620988627,
+          "max_usage": -0.31626696209886274,
+          "total_integrated": -1.5813348104943135
+        }
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "version": 3,
+    "timestamp": "2026-09-15T15:53:49.760662",
+    "params": {
+      "omega_gain": 43.668397920996966,
+      "nonlinear_gain": 39.91735532514478,
+      "theta_integral_gain": 12.925563272836143,
+      "theta_gain": 56.14657911003547,
+      "torque_limit": 0.31807807171456637
+    },
+    "cost": 1.7179683006862303,
+    "param_count": 5,
+    "diagnosis_summary": "# 1. Executive Summary\n\n**Single most critical issue:** The optimization consistently fails to reduce the **θ-state deviation**, which dominates the total cost. Across V1–V2, θ remains essentially unchanged (`final_dev: 0.2978 → 0.2973`, `max_dev=0.5000`, `integrated_dev: 0.7800 → 0.7817`), indicating that the current controller structure cannot effectively regulate θ despite parameter variation.\n\nThe optimization has reduced neither the peak deviation nor the accumulated tracking error, while ω",
+    "metrics": {
+      "state_stats": {
+        "theta": {
+          "final_mean": 0.29733875909820684,
+          "final_deviation": 0.29733875909820684,
+          "max_deviation": 0.5,
+          "integrated": 0.7816621975894076
+        },
+        "omega": {
+          "final_mean": 0.0,
+          "final_deviation": 0.0,
+          "max_deviation": 0.0,
+          "integrated": 0.0
+        }
+      },
+      "control_stats": {
+        "torque": {
+          "mean_usage": -0.3180780717145664,
+          "max_usage": -0.31807807171456637,
+          "total_integrated": -1.5903903585728316
+        }
+      },
+      "anomalies": []
+    }
+  }
+]

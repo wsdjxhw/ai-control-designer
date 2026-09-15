@@ -1,0 +1,36 @@
+{
+  "domain_name": "spring_mass_damper",
+  "model_type": "spring_mass",
+  "state_names": [
+    "position",
+    "velocity"
+  ],
+  "control_names": [
+    "force"
+  ],
+  "target_values": {
+    "position": 0.0,
+    "velocity": 0.0
+  },
+  "physical_params": {
+    "mass": 1.0,
+    "damping": 0.5,
+    "spring_constant": 2.0
+  },
+  "control_type": "continuous",
+  "control_limits": {
+    "force": [
+      -10.0,
+      10.0
+    ]
+  },
+  "temporal": {
+    "T": 10.0,
+    "dt": 0.01
+  },
+  "initial_state": {
+    "position": 1.0,
+    "velocity": 0.0
+  },
+  "_model_code": "import numpy as np\nfrom core.base.base_model import BaseModel\n\nclass SpringMassModel(BaseModel):\n    def __init__(self, scene_config):\n        params = scene_config.get(\"physical_params\", {})\n        self.mass = params.get(\"mass\", 1.0)\n        self.damping = params.get(\"damping\", 0.5)\n        self.spring_constant = params.get(\"spring_constant\", 2.0)\n        self.scene_config = scene_config\n\n    def get_initial_state(self, x_grid=None):\n        init = self.scene_config.get(\"initial_state\", {})\n        state_names = self.scene_config.get(\"state_names\", [])\n        return np.array([init.get(name, 0.0) for name in state_names])\n\n    def rhs(self, t, state, control, x_grid=None):\n        state_names = self.scene_config.get(\"state_names\", [])\n        control_names = self.scene_config.get(\"control_names\", [])\n        # Unpack state\n        if len(state_names) == 2:\n            x, v = state\n        else:\n            raise ValueError(\"Unexpected number of states\")\n        # Unpack control\n        u = control[0] if len(control) == 1 else control\n        # Dynamics: m * dv/dt = -k*x - c*v + u\n        dx = v\n        dv = (-self.spring_constant * x - self.damping * v + u) / self.mass\n        return np.array([dx, dv])\n\n    def validate_state(self, state):\n        return True"
+}

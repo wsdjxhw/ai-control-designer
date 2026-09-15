@@ -1,0 +1,7 @@
+{
+  "omega_gain": 43.668397920996966,
+  "nonlinear_gain": 39.91735532514478,
+  "theta_integral_gain": 12.925563272836143,
+  "theta_gain": 56.14657911003547,
+  "torque_limit": 0.31807807171456637
+}

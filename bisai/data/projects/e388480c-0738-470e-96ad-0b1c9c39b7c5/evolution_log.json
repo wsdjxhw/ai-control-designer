@@ -1,0 +1,113 @@
+[
+  {
+    "version": 1,
+    "timestamp": "2026-09-15T14:15:57.354606",
+    "params": {
+      "torque_limit": 15.14045108703893,
+      "kp": 0.7970116987326266,
+      "kd": 21.02740547448647
+    },
+    "cost": 1.7183506028474134,
+    "param_count": 3,
+    "diagnosis_summary": "## System Automatic Diagnosis (LLM service temporarily unavailable)\n\n**Current Metrics**:\n=== Evolution Metrics ===\n  State theta: final_mean=0.2978, final_dev=0.2978, max_dev=0.5000, integrated_dev=0.7800\n  State omega: final_mean=0.0000, final_dev=0.0000, max_dev=0.0000, integrated_dev=0.0000\n  Control torque: mean=-0.3120, total=-1.5600\n\n**Structural Modification Suggestions**:\n- Check if parameters are hitting bounds; consider adjusting parameter ranges.\n\n**Error**: LLM 调用失败: Error code: 429",
+    "metrics": {
+      "state_stats": {
+        "theta": {
+          "final_mean": 0.2978377130506861,
+          "final_deviation": 0.2978377130506861,
+          "max_deviation": 0.5,
+          "integrated": 0.7800135668088868
+        },
+        "omega": {
+          "final_mean": 0.0,
+          "final_deviation": 0.0,
+          "max_deviation": 0.0,
+          "integrated": 0.0
+        }
+      },
+      "control_stats": {
+        "torque": {
+          "mean_usage": -0.31201958443733147,
+          "max_usage": -0.2378777220835161,
+          "total_integrated": -1.5599744781609055
+        }
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "version": 2,
+    "timestamp": "2026-09-15T14:16:54.399752",
+    "params": {
+      "torque_limit": 0.27977680445469166,
+      "kp": 8.064303215177814,
+      "kd": 55.81390040431239,
+      "nonlinear_gain": 8.856755998564283
+    },
+    "cost": 1.7186535723272915,
+    "param_count": 4,
+    "diagnosis_summary": "## System Automatic Diagnosis (LLM service temporarily unavailable)\n\n**Current Metrics**:\n=== Evolution Metrics ===\n  State theta: final_mean=0.2989, final_dev=0.2989, max_dev=0.5000, integrated_dev=0.7846\n  State omega: final_mean=0.0000, final_dev=0.0000, max_dev=0.0000, integrated_dev=0.0000\n  Control torque: mean=-0.2798, total=-1.3989\n\n**Structural Modification Suggestions**:\n- Check if parameters are hitting bounds; consider adjusting parameter ranges.\n\n**Error**: LLM 调用失败: Error code: 429",
+    "metrics": {
+      "state_stats": {
+        "theta": {
+          "final_mean": 0.29887498381421657,
+          "final_deviation": 0.29887498381421657,
+          "max_deviation": 0.5,
+          "integrated": 0.7846467452318698
+        },
+        "omega": {
+          "final_mean": 0.0,
+          "final_deviation": 0.0,
+          "max_deviation": 0.0,
+          "integrated": 0.0
+        }
+      },
+      "control_stats": {
+        "torque": {
+          "mean_usage": -0.2797768044546917,
+          "max_usage": -0.27977680445469166,
+          "total_integrated": -1.3988840222734584
+        }
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "version": 3,
+    "timestamp": "2026-09-15T14:18:53.412173",
+    "params": {
+      "kp": 23.14992935825708,
+      "kd": 28.23225044292136,
+      "torque_limit": 0.4234212471084936,
+      "nonlinear_gain": 10.618778913105851,
+      "theta_cubic_gain": 33.76948681588457
+    },
+    "cost": 1.7239427387689954,
+    "param_count": 5,
+    "diagnosis_summary": "# 1. Executive Summary\n\n**Single most critical issue:** The controller is failing to meaningfully reduce the persistent **θ (theta) deviation**, with final deviation remaining essentially unchanged across all observed versions (0.2978 → 0.2989 → 0.2931), while total cost remains clustered around 1.72. The improvement from best historical value to current value is only **0.0047 absolute (≈1.6%)**, indicating the optimization is trapped in a flat performance region.\n\n---\n\n# 2. Parameter Bound Anal",
+    "metrics": {
+      "state_stats": {
+        "theta": {
+          "final_mean": 0.29311421122804737,
+          "final_deviation": 0.29311421122804737,
+          "max_deviation": 0.5,
+          "integrated": 0.7734997136873748
+        },
+        "omega": {
+          "final_mean": 0.0,
+          "final_deviation": 0.0,
+          "max_deviation": 0.0,
+          "integrated": 0.0
+        }
+      },
+      "control_stats": {
+        "torque": {
+          "mean_usage": -0.4234212471084936,
+          "max_usage": -0.4234212471084936,
+          "total_integrated": -2.1171062355424675
+        }
+      },
+      "anomalies": []
+    }
+  }
+]

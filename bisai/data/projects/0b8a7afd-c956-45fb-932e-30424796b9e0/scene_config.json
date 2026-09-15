@@ -1,0 +1,119 @@
+{
+  "domain_name": "UWSN",
+  "state_names": [
+    "Su",
+    "Iu",
+    "Ru",
+    "LSu",
+    "LIu",
+    "LRu",
+    "Sa",
+    "Ia",
+    "Ra",
+    "Sus"
+  ],
+  "control_names": [
+    "u1",
+    "u2",
+    "u3",
+    "u4",
+    "u5",
+    "u6"
+  ],
+  "temporal": {
+    "T": 1,
+    "dt": 0.02,
+    "n_steps": 50
+  },
+  "spatial": {
+    "x_length": 2,
+    "dx": 0.1,
+    "n_space_points": 21,
+    "n_intervals": 20
+  },
+  "initial_state": {
+    "Su": 0.5,
+    "Iu": 0,
+    "Ru": 0,
+    "LSu": 0,
+    "LIu": 0,
+    "LRu": 0,
+    "Sa": 1,
+    "Ia": 2,
+    "Ra": 0,
+    "Sus": 0,
+    "gaussian_center": "0.25*X",
+    "gaussian_sigma": "0.05*X"
+  },
+  "physical_params": {
+    "Du": 0.001,
+    "Da": 0.001,
+    "LA1": 0.08,
+    "LA2": 0.02,
+    "alpha1": 0.4,
+    "alpha2": 0.6,
+    "beta1": 0.2,
+    "beta2": 0.5,
+    "d1": 0.0005,
+    "d2": 0.0005,
+    "gamma1": 0.1,
+    "gamma3": 0.3,
+    "gamma4": 0.3,
+    "K1": 0.0515,
+    "K2": 0.061,
+    "K12": 0.0034,
+    "K21": 0.00064
+  },
+  "target_values": {
+    "Su": 1,
+    "Iu": 0,
+    "Ru": 0,
+    "LSu": 0,
+    "LIu": 0,
+    "LRu": 3,
+    "Sa": 2,
+    "Ia": 0,
+    "Ra": 0,
+    "Sus": 0
+  },
+  "control_limits": {},
+  "control_type": "bang_bang",
+  "cost_weights": {
+    "Su": 1,
+    "Iu": 1,
+    "Ru": 1,
+    "LSu": 1,
+    "LIu": 1,
+    "LRu": 1,
+    "Sa": 1,
+    "Ia": 1,
+    "Ra": 1,
+    "Sus": 1,
+    "u1": 0.1,
+    "u2": 0.1,
+    "u3": 0.1,
+    "u4": 0.1,
+    "u5": 0.1,
+    "u6": 0.1
+  },
+  "detected_type": "pde",
+  "model_type": "pde",
+  "cost_computation": "both",
+  "solver": {
+    "solver_type": "pde_rk4",
+    "solver_params": {}
+  },
+  "_model_code": "from core.base.base_model import BaseModel\nimport numpy as np\n\n\nclass UWSNModel(BaseModel):\n    \"\"\"UWSN 10 维反应-扩散 PDE\n\n    状态变量 (10 维):\n        0: Su, 1: Iu, 2: Ru, 3: LSu, 4: LIu, 5: LRu,\n        6: Sa, 7: Ia, 8: Ra, 9: Sus\n\n    控制变量 (6 维):\n        0: u1, 1: u2, 2: u3, 3: u4, 4: u5, 5: u6\n\n    ⚠️ 调试用参数（N=50 步，M+1=21 网格），演示时改大\n    \"\"\"\n\n    def __init__(self, scene_config=None):\n        if scene_config is None:\n            scene_config = {}\n        params = scene_config.get(\"physical_params\", {})\n\n        # 时间/空间（调试值）\n        self.T = params.get(\"T\", 1.0)\n        self.dt = params.get(\"dt\", 0.02)\n        self.X = params.get(\"X\", 2.0)\n        self.dx = params.get(\"dx\", 0.1)\n\n        # 物理参数\n        self.Du = params.get(\"Du\", 0.001)\n        self.Da = params.get(\"Da\", 0.001)\n        self.LA1 = params.get(\"LA1\", 0.08)\n        self.LA2 = params.get(\"LA2\", 0.02)\n        self.alpha1 = params.get(\"alpha1\", 0.4)\n        self.alpha2 = params.get(\"alpha2\", 0.6)\n        self.beta1 = params.get(\"beta1\", 0.2)\n        self.beta2 = params.get(\"beta2\", 0.5)\n        self.d1 = params.get(\"d1\", 0.0005)\n        self.d2 = params.get(\"d2\", 0.0005)\n        self.gamma1 = params.get(\"gamma1\", 0.1)\n        self.gamma3 = params.get(\"gamma3\", 0.3)\n        self.gamma4 = params.get(\"gamma4\", 0.3)\n\n        # 空间网格\n        self.M = int(round(self.X / self.dx))\n        self.x_grid = np.linspace(0, self.X, self.M + 1)\n\n    def get_initial_state(self, x_grid=None):\n        \"\"\"返回 shape (M+1, 10) 的高斯脉冲初始状态\"\"\"\n        M_plus1 = self.M + 1\n        state = np.zeros((M_plus1, 10))\n        xc = self.X * 0.25\n        sigma = self.X * 0.05\n        state[:, 0] = 0.5\n        state[:, 1] = 0.1 * np.exp(-((self.x_grid - xc) ** 2) / (2 * sigma ** 2))\n        state[:, 7] = 0.05 * np.exp(-((self.x_grid - xc) ** 2) / (2 * sigma ** 2))\n        return state\n\n    def rhs(self, t, state, control, x_grid=None):\n        \"\"\"10 维 PDE 的右端项\"\"\"\n        # 拉普拉斯\n        def lap(U):\n            L = np.zeros_like(U)\n            L[1:-1] = (U[:-2] - 2 * U[1:-1] + U[2:]) / (self.dx ** 2)\n            L[0] = L[1]\n            L[-1] = L[-2]\n            return L\n\n        ds = np.zeros_like(state)\n        for i in range(10):\n            ds[:, i] = (self.Du if i < 6 else self.Da) * lap(state[:, i])\n\n        Su, Iu, Ru = state[:, 0], state[:, 1], state[:, 2]\n        LSu, LIu, LRu = state[:, 3], state[:, 4], state[:, 5]\n        Sa, Ia, Ra, Sus = state[:, 6], state[:, 7], state[:, 8], state[:, 9]\n\n        # 控制（可能是 2D 或 1D）\n        c = control\n        if c.ndim == 1:\n            c = np.tile(c, (state.shape[0], 1))\n        u1, u2, u3, u4, u5, u6 = (c[:, j] for j in range(6))\n\n        # 传播率（简化常数）\n        K1, K2, K12, K21 = 0.0515, 0.061, 0.0034, 0.00064\n\n        ds[:, 0] += (self.LA1 - K1 * Su * Iu - K21 * Su * Ia\n                      - self.gamma1 * Su + self.alpha2 * Ru + u3 * LSu\n                      - self.d1 * Su - u1 * Su - self.gamma3 * Su - u6 * Su + self.gamma4 * Sus)\n        ds[:, 1] += (K1 * Su * Iu + K21 * Su * Ia\n                      - self.gamma1 * Iu + u3 * LIu - self.alpha1 * Iu - u4 * Iu - self.d1 * Iu)\n        ds[:, 2] += (self.alpha1 * Iu + u4 * Iu - self.alpha2 * Ru\n                      - self.gamma1 * Ru + u3 * LRu - self.d1 * Ru + u1 * Su)\n        ds[:, 3] += self.gamma1 * Su - u3 * LSu - self.d1 * LSu\n        ds[:, 4] += self.gamma1 * Iu - u3 * LIu - self.d1 * LIu\n        ds[:, 5] += self.gamma1 * Ru - u3 * LRu - self.d1 * LRu\n        ds[:, 6] += (self.LA2 - K2 * Sa * Ia - K12 * Sa * Iu\n                      + self.beta2 * Ra - self.d2 * Sa - u2 * Sa)\n        ds[:, 7] += (K2 * Sa * Ia + K12 * Sa * Iu\n                      - self.beta1 * Ia - u5 * Ia - self.d2 * Ia)\n        ds[:, 8] += (self.beta1 * Ia + u5 * Ia - self.beta2 * Ra\n                      - self.d2 * Ra + u2 * Sa)\n        ds[:, 9] += self.gamma3 * Su + u6 * Su - self.gamma4 * Sus - self.d1 * Sus\n        return np.array(ds)\n\n    def validate_state(self, state):\n        if np.isnan(state).any():\n            return False\n        if np.any(state > 1e5) or np.any(state < -1e3):\n            return False\n        return True",
+  "optimizer": {
+    "optimizer_type": "tpe",
+    "popsize": 50,
+    "sigma0": 0.25,
+    "n_particles": 30,
+    "w": 0.7,
+    "c1": 1.5,
+    "c2": 1.5,
+    "max_iter": 100,
+    "n_startup_trials": 10,
+    "n_ei_candidates": 24
+  }
+}

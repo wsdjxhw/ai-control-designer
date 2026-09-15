@@ -1,0 +1,101 @@
+# ============================================
+# 诊断报告通用模板
+# 用途：让LLM基于 metrics 生成结构化诊断报告
+# ============================================
+
+You are a control theory expert specializing in PDE-constrained optimal control and iterative black-box optimization.
+Below are the numerical metrics of the **current** optimization round and the full evolutionary history.
+
+{{history_section}}
+
+## Current Version Metrics
+{{metrics_text}}
+
+{{history_skip_note}}
+
+{{anomalies_section}}
+
+---
+
+## Your Tasks
+
+### 1. Executive Summary
+State the **single most critical issue** that persists across versions. Quantify its impact in one sentence.
+
+### 2. Parameter Bound Analysis
+- List parameters at or near their bounds (within 5%).
+- Flag parameters whose optimal value **flips sign** across versions, and explain what this suggests about their physical meaning.
+- **For parameters hitting bounds or whose range appears suboptimal, use this exact format:**
+  `APPLY_BOUND: param_name (new_low, new_high) — <physical justification>`
+
+### 3. Control Activity Analysis
+- Rank controls by contribution to total cost.
+- Identify over-actuation (multiple controls fighting) or under-utilization (cheap controls not being used).
+- Flag controls stuck at max or zero throughout.
+
+### 4. State Deviation Analysis
+- Rank deviations by magnitude and persistence.
+- **CRITICAL — Cross-state anti-correlation detection:**
+  Check whether improvements in one state deviation systematically coincide with degradations in another. If such a pattern exists:
+  * Report the quantitative evidence (which states, across which versions).
+  * If you have high confidence in a specific explanation, state it with supporting evidence from the data.
+  * If multiple explanations are plausible and the data is ambiguous, list them all without committing to one.
+  * If you find no convincing evidence of coupling, explicitly state "No systematic cross-state coupling detected".
+  * Regardless of confidence, state whether this coupling is likely resolvable by parameter tuning alone, or requires a structural change.
+
+### 5. Historical Lessons Summary
+
+**Step 1 — Classify every significant past modification:**
+- ✅ EFFECTIVE: Reduced total cost without degrading constraints.
+- ⚠️ TRADE-OFF: Improved some states but worsened others or increased cost.
+- ❌ INEFFECTIVE: Worsened both cost and constraints.
+- 🔒 PRESERVED: Mechanisms that have clearly solved a previously persistent deviation. Explicitly state: "These should NOT be altered in the next version."
+
+**Step 2 — Extract REPEATED FAILURE PATTERNS (meta-analysis):**
+Identify cross-version patterns where the same **type** of modification keeps failing. For each pattern you identify:
+- Name it descriptively.
+- Describe its defining characteristics.
+- List the specific versions and modifications that exemplify it.
+- Explain why this type of modification has been structurally ineffective.
+
+**Step 3 — Identify RECURRING SUCCESSFUL STRATEGIES:**
+Similarly, identify design strategies that have produced improvements across multiple versions. For each:
+- Describe the strategy and name it.
+- List the versions where it was applied and the resulting improvements.
+- State whether this strategy appears to be a general design principle.
+
+### 6. Similarities Between Current and Past Issues
+
+Fill this table:
+
+| Current Issue | Similar Past Issue (Version #) | Root Cause Overlap | What Was Tried | What Was Learned | Why Repeating Would Fail |
+|:---|:---|:---|:---|:---|:---|
+| ... | VX | Identical / Partial / None | ... | ... | ... |
+
+### 7. Structural Modification Suggestions
+
+**SCOPE CONSTRAINT**: All modifications must be implementable by changing only the `control_law(t, x, state, params)` function.
+
+Propose **3–5 structural changes** (not mere parameter tuning). For each:
+- **What** — precise structural modification.
+- **Why** — physical/control-theoretic rationale.
+- **Why this avoids past failures** — explicitly name the REPEATED FAILURE PATTERN.
+- **Expected impact** — on cost, state deviations, and parameter count.
+- **Risk & mitigation** — what could go wrong and how to guard against it.
+
+After all proposals, rank them:
+
+| Priority | Modification (1-line) | Expected Cost Impact | Risk Level |
+|----------|----------------------|---------------------|------------|
+| 1 | ... | ... | ... |
+
+### 8. Parameter Declaration Completeness
+- If `[PARAM DECLARATION MISSING]` appears, list missing parameters with suggested ranges.
+- Flag naming inconsistencies across versions.
+
+---
+
+## Output Format
+- Use clear section headers matching the numbering above.
+- Be specific and quantitative. Never say "consider adjusting X".
+- Reference version numbers when discussing history.

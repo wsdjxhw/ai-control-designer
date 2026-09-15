@@ -1,0 +1,37 @@
+===== V1 演化诊断报告 =====
+本轮代价: 1.718351
+我可以按这个模板生成诊断报告，但当前输入里**没有提供 Evolution History（演化历史）内容**，只有当前版本指标：
+
+- θ:
+  - final_mean = 0.2978
+  - final_dev = 0.2978
+  - max_dev = 0.5000
+  - integrated_dev = 0.7800
+- ω:
+  - final_mean = 0
+  - final_dev = 0
+  - max_dev = 0
+  - integrated_dev = 0
+- Control torque:
+  - mean = -0.3121
+  - total = -1.5603
+
+因此以下部分无法可靠完成：
+- 参数跨版本符号翻转分析
+- 历史修改有效性分类
+- 重复失败模式分析
+- 成功策略提取
+- 当前问题与历史版本对照表
+
+如果直接生成，会不可避免地编造版本信息。
+
+请补充：
+
+```
+=== 演化历史 (完整) ===
+Version 1:
+- params:
+- cost:
+- theta deviation:
+- omega deviation:
+

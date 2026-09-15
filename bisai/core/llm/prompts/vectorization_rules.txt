@@ -1,0 +1,86 @@
+# ============================================
+# 向量化安全规则（通用版 v2 - 纯文本版）
+# 用途：在 modify_control_law 时注入，防止 LLM 生成崩溃代码
+# 注意：本文件不包含任何领域特定内容（列数、T、控制类型由现有代码决定）
+# ============================================
+
+CRITICAL: VIOLATING ANY OF THE FOLLOWING RULES WILL CAUSE THE PYTHON CODE TO CRASH IMMEDIATELY WITH A TYPEERROR OR VALUEERROR.
+
+===== RULE 1: NEVER USE float(), int(), bool() ON NUMPY ARRAYS =====
+
+When you write a comparison like x > threshold, the result is a boolean array.
+Applying float() to it WILL CRASH.
+
+WRONG (will crash):
+  - float(x > threshold)
+  - int(cond_array)
+  - bool(array * scalar)
+  - float(u)  where u is an array
+
+CORRECT:
+  - (x > threshold).astype(float)
+  - cond_array.astype(int)
+  - (array * scalar).astype(bool)
+  - u  (direct assignment, no cast)
+
+REPEAT: IF YOU SEE float( FOLLOWED BY ANY EXPRESSION INVOLVING >, <, ==, &, |,
+IT WILL CRASH. USE .astype(float) INSTEAD.
+
+===== RULE 2: USE BITWISE OPERATORS & / | IN np.where, NOT and / or =====
+
+WRONG:
+  - np.where(cond1 and cond2, 1, 0)
+  - np.where(cond1 or cond2, 1, 0)
+
+CORRECT:
+  - np.where(cond1 & cond2, 1, 0)
+  - np.where(cond1 | cond2, 1, 0)
+
+===== RULE 3: USE NUMPY FUNCTIONS FOR ARRAYS, NOT PYTHON BUILT-INS =====
+
+WRONG:
+  - max(arr)
+  - min(arr)
+  - abs(arr)
+
+CORRECT:
+  - np.max(arr)
+  - np.min(arr)
+  - np.abs(arr)
+
+===== RULE 4: DO NOT HARDCODE DOMAIN-SPECIFIC CONSTANTS =====
+
+- Do NOT hardcode the return shape (e.g., "must be 6 columns").
+  The correct number of columns is determined by the EXISTING code.
+- Do NOT hardcode the simulation time T (e.g., "T = 3.0").
+  The correct T comes from the scene configuration, not from this file.
+- Do NOT hardcode control types (bang-bang vs continuous).
+  The correct type is determined by the EXISTING code.
+
+Always infer these values from the existing control law code.
+
+===== RULE 5: RETURN SHAPE MUST MATCH THE EXISTING CONTROL LAW =====
+
+- If the current control_law returns shape (N,) for N controls, keep it.
+- If the current control_law returns shape (M+1, N), keep it.
+- Do NOT change the return shape unless the diagnostic report explicitly asks you to.
+
+===== RULE 6: PRESERVE EXISTING PARAMETER NAMES WHEN POSSIBLE =====
+
+- If the current code uses params.get("gain_theta", ...), keep that name.
+- Only introduce new parameter names when the modification genuinely requires
+  a new tunable quantity.
+- Do not rename existing parameters without strong reason.
+
+===== RULE 7: SELF-CHECK CHECKLIST (INCLUDE AT TOP OF GENERATED CODE) =====
+
+Include this checklist as # comments at the top of the generated code:
+
+# ========== VECTORIZATION SELF-CHECK ==========
+# [ ] 1. No float(, int(, bool( applied to any array or comparison expression.
+# [ ] 2. All np.where conditions use & or |, not and or or.
+# [ ] 3. np.max / np.min used instead of max / min.
+# [ ] 4. No hardcoded return shape or T constant (inferred from existing code).
+# [ ] 5. Return shape matches the original control_law.
+# [ ] 6. Existing parameter names preserved where applicable.
+# ==============================================

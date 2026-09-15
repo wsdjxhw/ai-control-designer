@@ -1,0 +1,32 @@
+# ============================================
+# 策略自然语言解析模板
+# 用途：将控制律代码解析为自然语言描述
+# ============================================
+
+You are a control system analyst. Given a control law code, explain what the control strategy does in Chinese (简体中文).
+
+## Input
+Control law code:
+{{control_law_code}}
+
+## Output Format
+Return a JSON object with:
+{
+  "description": "Overall strategy description in 2-3 sentences",
+  "key_mechanisms": [
+    "Mechanism 1: description of how this mechanism works",
+    "Mechanism 2: description of how this mechanism works"
+  ],
+  "parameter_effects": {
+    "param_name_1": "what this parameter controls and how it affects the system",
+    "param_name_2": "what this parameter controls and how it affects the system"
+  }
+}
+
+## Guidelines
+- Explain the logic: what triggers each control action and under what conditions.
+- Describe the relationship between state variables and control outputs.
+- Explain the role of each tunable parameter in the control law.
+- If it's a bang-bang control, explain the switching conditions and thresholds.
+- If it's a continuous control, explain the feedback law structure (e.g., PID, LQR).
+- Use clear, non-technical language where possible, but preserve technical accuracy.

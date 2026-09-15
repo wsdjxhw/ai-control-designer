@@ -1,0 +1,110 @@
+[
+  {
+    "version": 1,
+    "timestamp": "2026-09-15T15:19:38.637729",
+    "params": {
+      "torque_limit": 15.14045108703893,
+      "kp": 0.7970116987326266,
+      "kd": 21.02740547448647
+    },
+    "cost": 1.7183506028474134,
+    "param_count": 3,
+    "diagnosis_summary": "# 1. Executive Summary\n\n**最关键问题：`theta` 仍存在显著稳态偏差。**  \n当前 `theta` 的最终偏差与最终均值均为 **0.2978**，占最大偏差上限 `0.5000` 的 **59.6%**，同时积分偏差达到 **0.7800**，说明系统虽然未发散，但长期保持明显静态误差，成为当前总性能损失的主要来源。\n\n---\n\n# 2. Parameter Bound Analysis\n\n## 参数边界情况\n\n当前提供的数据中：\n\n- 未提供参数列表\n- 未提供参数取值历史\n- 未提供各版本参数演化记录\n\n因此无法判断：\n\n- 哪些参数接近边界（5%以内）\n- 哪些参数发生符号翻转\n- 哪些参数长期卡在上下界\n\n### Bound Recommendation\n\n无法生成：\n\n```text\nAPPLY_BOUND: ...\n```\n\n因为缺少参数声明与历史参数轨迹。\n\n---\n\n# 3. Control Activity Analysis\n\n## Control Ranking\n\n当前仅存在一个控制量：\n\n| Rank | Control | Me",
+    "metrics": {
+      "state_stats": {
+        "theta": {
+          "final_mean": 0.2978377130506861,
+          "final_deviation": 0.2978377130506861,
+          "max_deviation": 0.5,
+          "integrated": 0.7800135668088868
+        },
+        "omega": {
+          "final_mean": 0.0,
+          "final_deviation": 0.0,
+          "max_deviation": 0.0,
+          "integrated": 0.0
+        }
+      },
+      "control_stats": {
+        "torque": {
+          "mean_usage": -0.31201958443733147,
+          "max_usage": -0.2378777220835161,
+          "total_integrated": -1.5599744781609055
+        }
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "version": 2,
+    "timestamp": "2026-09-15T15:21:16.250114",
+    "params": {
+      "torque_limit": 15.14045108703893,
+      "kp": 0.7970116987326266,
+      "kd": 21.02740547448647
+    },
+    "cost": 1.7183506028474134,
+    "param_count": 3,
+    "diagnosis_summary": "# 1. Executive Summary\n\n**最关键且持续存在的问题：`theta` 的显著稳态偏差。**\n\n当前唯一可观测状态中，`theta.final_dev = 0.2978`，达到允许最大偏差 `0.5000` 的 **59.6%**，同时累计偏差 `integrated_dev = 0.7800`，而 `omega` 已完全收敛至零，因此当前总代价（1.7184）的主要来源可明确归因于 **长期未消除的静态误差而非动态振荡或控制消耗**。\n\n---\n\n# 2. Parameter Bound Analysis\n\n## 边界参数检查\n\n当前仅有一个版本（V1）：\n\n| Parameter | Value |\n|------------|------------|\n| torque_limit | 15.1405 |\n| kp | 0.7970 |\n| kd | 21.0274 |\n\n由于：\n\n- 未提供参数上下界；\n- 未提供搜索空间定义；\n- 无多版本参数演化；\n\n因此无法判断：\n\n- 是否接近边界（5%以内）；\n- 是否存在边界饱和；\n- 是否应收缩或扩展参数范围。",
+    "metrics": {
+      "state_stats": {
+        "theta": {
+          "final_mean": 0.2978377130506861,
+          "final_deviation": 0.2978377130506861,
+          "max_deviation": 0.5,
+          "integrated": 0.7800135668088868
+        },
+        "omega": {
+          "final_mean": 0.0,
+          "final_deviation": 0.0,
+          "max_deviation": 0.0,
+          "integrated": 0.0
+        }
+      },
+      "control_stats": {
+        "torque": {
+          "mean_usage": -0.31201958443733147,
+          "max_usage": -0.2378777220835161,
+          "total_integrated": -1.5599744781609055
+        }
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "version": 3,
+    "timestamp": "2026-09-15T15:23:09.625299",
+    "params": {
+      "torque_limit": 15.14045108703893,
+      "kp": 0.7970116987326266,
+      "kd": 21.02740547448647
+    },
+    "cost": 1.7183506028474134,
+    "param_count": 3,
+    "diagnosis_summary": "# 1. Executive Summary\n\n**最关键且跨版本持续存在的问题：`theta` 的显著稳态偏差未被消除。**\n\n在 V1→V2 的全部历史中，总代价始终为 **1.7184**，而 `theta.final_dev = 0.2978`，达到允许最大偏差 `0.5000` 的 **59.6%**；同时 `theta.integrated_dev = 0.7800`，说明性能损失主要来自**长期静态误差**而非振荡、超调或控制能耗。\n\n---\n\n# 2. Parameter Bound Analysis\n\n## 边界参数检查\n\n当前仅有两个版本，且参数完全相同：\n\n| Parameter | Value |\n|------------|---------:|\n| torque_limit | 15.1405 |\n| kp | 0.7970 |\n| kd | 21.0274 |\n\n由于未提供参数上下界，无法严格判断是否位于边界 5% 范围内。\n\n**未发现符号翻转（sign flip）现象：**\n\n| Parameter | V1 | V2 | Sign Flip |\n|-",
+    "metrics": {
+      "state_stats": {
+        "theta": {
+          "final_mean": 0.2978377130506861,
+          "final_deviation": 0.2978377130506861,
+          "max_deviation": 0.5,
+          "integrated": 0.7800135668088868
+        },
+        "omega": {
+          "final_mean": 0.0,
+          "final_deviation": 0.0,
+          "max_deviation": 0.0,
+          "integrated": 0.0
+        }
+      },
+      "control_stats": {
+        "torque": {
+          "mean_usage": -0.31201958443733147,
+          "max_usage": -0.2378777220835161,
+          "total_integrated": -1.5599744781609055
+        }
+      },
+      "anomalies": []
+    }
+  }
+]

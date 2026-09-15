@@ -1,0 +1,20 @@
+{
+  "domain": "custom",
+  "state_names": [
+    "x1",
+    "x2"
+  ],
+  "control_names": [
+    "u1"
+  ],
+  "target_values": {
+    "x1": 1,
+    "x2": 0.5
+  },
+  "cost_weights": {
+    "x1": 1,
+    "x2": 1,
+    "u1": 0.1
+  },
+  "solver_type": "rk4"
+}

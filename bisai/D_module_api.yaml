@@ -1,0 +1,209 @@
+openapi: 3.0.0
+info:
+  title: D Module (LLM/RAG) API
+  version: 1.0.0
+  description: D模块智能层接口定义，供B模块调用
+
+paths:
+  /api/v1/rag/search:
+    post:
+      summary: 策略语义检索
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                query:
+                  type: string
+                  description: 检索文本
+                top_k:
+                  type: integer
+                  default: 5
+                filters:
+                  type: object
+                  description: 过滤条件（支持 domain 过滤）
+              required: [query]
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        code:
+                          type: string
+                        metadata:
+                          type: object
+                          properties:
+                            domain:
+                              type: string
+                            version:
+                              type: integer
+                            cost:
+                              type: number
+                            params:
+                              type: object
+                            diagnosis_summary:
+                              type: string
+                            created_at:
+                              type: string
+                        similarity:
+                          type: number
+                          description: 相似度分数，0~1，越大越相似
+
+  /api/v1/rag/store:
+    post:
+      summary: 策略入库
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id, code, metadata]
+              properties:
+                id:
+                  type: string
+                  description: 策略唯一标识，如 uwsn_v12
+                code:
+                  type: string
+                  description: 控制律代码全文
+                metadata:
+                  type: object
+                  required: [domain, version, cost, params]
+                  properties:
+                    domain:
+                      type: string
+                    version:
+                      type: integer
+                    cost:
+                      type: number
+                    params:
+                      type: object
+                    diagnosis_summary:
+                      type: string
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+
+  /api/v1/llm/generate-scene:
+    post:
+      summary: 新手模式生成场景配置
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [description]
+              properties:
+                description:
+                  type: string
+                  description: 用户自然语言描述
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  scene_config:
+                    type: object
+                    description: 场景配置
+                  model_code:
+                    type: string
+                    description: 模型代码
+                  cost_function:
+                    type: object
+                    description: 代价函数建议
+
+  /api/v1/llm/validate-physics:
+    post:
+      summary: 物理验证
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [model_code, scene_config]
+              properties:
+                model_code:
+                  type: string
+                scene_config:
+                  type: object
+                level:
+                  type: string
+                  enum: [L1, L2, L3]
+                  default: L1
+                  description: 验证级别，默认 L1
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  L1:
+                    type: boolean
+                  L2:
+                    type: boolean
+                  L3:
+                    type: boolean
+                  details:
+                    type: string
+
+  /api/v1/llm/parse-strategy:
+    post:
+      summary: 策略自然语言解析
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code:
+                  type: string
+                  description: 控制律代码
+                params:
+                  type: object
+                  description: 最优参数
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  description:
+                    type: string
+                  key_mechanisms:
+                    type: array
+                    items:
+                      type: string
+                  parameter_effects:
+                    type: object

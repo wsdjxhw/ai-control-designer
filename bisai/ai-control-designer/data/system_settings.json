@@ -1,0 +1,14 @@
+{
+  "llm": {
+    "model": "moonshotai/Kimi-K2.5",
+    "api_key": "",
+    "base_url": "https://api-inference.modelscope.cn/v1",
+    "temperature": 0.0,
+    "max_retries": 30
+  },
+  "optimizer_defaults": {
+    "type": "cmaes",
+    "trials": 1000,
+    "seed": 42
+  }
+}

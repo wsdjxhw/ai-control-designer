@@ -1,0 +1,86 @@
+"""抽象基类：动力学模型接口。
+
+所有领域模型（UWSN、SIR、直流电机等）必须实现此接口。
+"""
+
+from abc import ABC, abstractmethod
+
+import numpy as np
+
+
+class BaseModel(ABC):
+    """动力学模型抽象基类。
+
+    子类需实现 rhs、get_initial_state、validate_state 方法。
+    state_dim 和 control_dim 为可选属性（可从 scene_config 推断）。
+    """
+
+    @property
+    def state_dim(self) -> int:
+        """状态空间维度（默认从 scene_config 推断，可被子类重写）。"""
+        # 默认返回 -1，表示需要子类实现
+        # 动态加载的模型可以通过 scene_config 推断
+        return -1
+
+    @property
+    def control_dim(self) -> int:
+        """控制输入维度（默认从 scene_config 推断，可被子类重写）。"""
+        return -1
+
+    @property
+    def N(self) -> int:
+        """时间步数（默认 100，可被子类重写）。"""
+        return 100
+
+    @property
+    def dt(self) -> float:
+        """时间步长（默认 0.01，可被子类重写）。"""
+        return 0.01
+
+    @property
+    def dx(self) -> float:
+        """空间步长（PDE 模型需要，ODE 模型返回 0）。"""
+        return 0.0
+
+    @property
+    def state_names(self) -> list:
+        """状态变量名称列表（默认空列表，可被子类重写）。"""
+        return []
+
+    @property
+    def control_names(self) -> list:
+        """控制输入名称列表（默认空列表，可被子类重写）。"""
+        return []
+
+    @property
+    def x_grid(self):
+        """空间网格（PDE 模型需要，ODE 模型返回 None）。"""
+        return None
+
+    @abstractmethod
+    def get_initial_state(self, x_grid=None) -> np.ndarray:
+        """返回初始状态向量, shape (state_dim,)."""
+        ...
+
+    @abstractmethod
+    def rhs(self, t: float, state: np.ndarray, control: np.ndarray, x_grid=None) -> np.ndarray:
+        """计算微分方程右端项。
+
+        Args:
+            t: 当前时间.
+            state: 当前状态, shape (state_dim,).
+            control: 当前控制输入, shape (control_dim,).
+            x_grid: 空间网格（PDE 模型需要）.
+
+        Returns:
+            状态导数, shape (state_dim,).
+        """
+        ...
+
+    def validate_state(self, state: np.ndarray) -> bool:
+        """校验状态是否在物理允许范围内。
+
+        默认总是返回 True，子类可重写以实现自定义校验逻辑。
+        90% 的模型不需要状态校验，因此提供默认实现以减少样板代码。
+        """
+        return True

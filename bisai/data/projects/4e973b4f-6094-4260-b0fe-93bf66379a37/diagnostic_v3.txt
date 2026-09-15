@@ -1,0 +1,9 @@
+===== V3 演化诊断报告 =====
+本轮代价: 1.717968
+# 1. Executive Summary
+
+**Single most critical issue:** The optimization consistently fails to reduce the **θ-state deviation**, which dominates the total cost. Across V1–V2, θ remains essentially unchanged (`final_dev: 0.2978 → 0.2973`, `max_dev=0.5000`, `integrated_dev: 0.7800 → 0.7817`), indicating that the current controller structure cannot effectively regulate θ despite parameter variation.
+
+The optimization has reduced neither the peak deviation nor the accumulated tracking error, while ω
+
+[演化完成] 最优代价: 1.717968

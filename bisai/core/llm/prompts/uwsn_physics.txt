@@ -1,0 +1,47 @@
+# ============================================
+# UWSN 水下传感器网络物理先验
+# 用途：生成/修改 UWSN 控制律时注入
+# ============================================
+
+## 1. Physical System and State Variables
+
+1D underwater space [0, X], X=2.0, time [0, T], T=3.0.
+State variables are fields varying with space x and time t (1D numpy arrays):
+- UWSN nodes: Su (susceptible), Iu (infected), Ru (recovered), LSu (low-energy susceptible), LIu (low-energy infected), LRu (low-energy recovered), Sus (sleeping)
+- AUV nodes: Sa (susceptible), Ia (infected), Ra (recovered)
+
+Key parameters:
+- Transmission rate functions (all vary with x as cosine):
+  K1(x) = 0.0515 * (1 + 0.4*cos(x+π))
+  K2(x) = 0.061  * (1 + 0.5*cos(x+π))
+  K12(x)= 0.0034 * (1 + 0.3*cos(x+π))
+  K21(x)= 0.00064* (1 + 0.5*cos(x+π))
+- Natural conversion rates: alpha1 (Iu→Ru), alpha2 (Ru→Su), beta1 (Ia→Ra), beta2 (Ra→Sa)
+- Energy conversion rates: gamma1 (normal→low-energy), gamma3 (sleep→wake-up), gamma4 (normal→sleep)
+
+## 2. Control Variables and Coupling Relationships
+
+| Control | Physical Action                     | Values     | Cost Coefficient C |
+|---------|-------------------------------------|------------|--------------------|
+| u1 (α3) | Su → Ru (preventive treatment)      | {0, 1}     | 0.5                |
+| u2 (β3) | Sa → Ra (AUV treatment)             | {0, 1}     | 0.3                |
+| u3 (γ2) | LSu→Su, LIu→Iu, LRu→Ru (wake-up)    | {0, 1}     | 0.5                |
+| u4      | Iu → Ru (intensified treatment)     | {0, 0.5}   | 1.8                |
+| u5      | Ia → Ra (AUV intensified treatment) | {0, 0.5}   | 5.5                |
+| u6      | Su → Sus (forced sleep for energy saving) | {0, 0.5} | 2.1                |
+
+**Hard constraint for this Case**: This is Case 2 (full control). ALL six control variables are available. The returned array must have exactly 6 columns: [u1, u2, u3, u4, u5, u6].
+
+## 3. Optimization Objective
+
+Minimize total cost J = J_running + J_control + J_terminal:
+
+J_running = ∫∫ [ (Iu-1.2)² + (Ia-1.2)² + (LSu-0.5)² + (LIu-0.2)² + (LRu-0.8)² ] dx dt
+
+J_control = ∫∫ [ 0.5*u1 + 0.3*u2 + 0.5*u3 + 1.8*u4 + 5.5*u5 + 2.1*u6 ] dx dt
+
+J_terminal = ∫ [ (Iu(T)-1.2)² + (Ia(T)-1.2)² + (LSu(T)-0.5)² + (LIu(T)-0.2)² + (LRu(T)-0.8)² ] dx
+
+Desired state values: Iu=1.2, Ia=1.2, LSu=0.5, LIu=0.2, LRu=0.8.
+
+**Important**: This is a state regulation problem, not an eradication problem. The cost function penalizes deviations from the target values above—the optimal strategy maintains states near these targets, it does NOT drive infections to zero. The system also needs to maintain certain proportions of low-energy nodes.

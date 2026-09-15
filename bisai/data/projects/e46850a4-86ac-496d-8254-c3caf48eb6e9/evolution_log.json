@@ -1,0 +1,38 @@
+[
+  {
+    "version": 1,
+    "timestamp": "2026-09-15T15:47:59.349186",
+    "params": {
+      "theta_gain": 0.016850728531324743,
+      "torque_limit": 53.11658658479431,
+      "omega_gain": 58.43071874650229
+    },
+    "cost": 2.617549883761728,
+    "param_count": 3,
+    "diagnosis_summary": "你提供的是一个**诊断报告生成模板**，但当前消息里没有包含实际的 **Evolution History（各版本历史指标/参数修改记录）**，只有当前版本 metrics：\n\n- θ deviation:\n  - final_mean = 0.4985\n  - final_dev = 0.4985\n  - max_dev = 0.5000\n  - integrated_dev = -0.0062\n- ω deviation:\n  - final_mean = 0.1177\n  - final_dev = 0.1177\n  - max_dev = 0.1177\n  - integrated_dev = -0.0002\n- Control torque:\n  - mean = -0.0084\n  - total = 0.0002\n\n因此无法完成模板要求中的：\n- 跨版本参数翻转分析；\n- 历史修改有效性分类；\n- 重复失败模式提取；\n- 成功策略总结；\n- 当前问题与历史版本对照；\n- 参数边界变化建议。\n\n基于当前版本数据，只能生成**单轮诊断部分**：\n\n---\n\n# 1. Exec",
+    "metrics": {
+      "state_stats": {
+        "theta": {
+          "final_mean": 0.4985282883325973,
+          "final_deviation": 0.4985282883325973,
+          "max_deviation": 0.5,
+          "integrated": -0.006231630678347866
+        },
+        "omega": {
+          "final_mean": 0.1176841189584825,
+          "final_deviation": 0.1176841189584825,
+          "max_deviation": 0.1176841189584825,
+          "integrated": -0.00017311939818792828
+        }
+      },
+      "control_stats": {
+        "torque": {
+          "mean_usage": -0.008425364265662372,
+          "max_usage": -0.008425364265662372,
+          "total_integrated": 0.00021063410664155931
+        }
+      },
+      "anomalies": []
+    }
+  }
+]
