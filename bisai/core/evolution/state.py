@@ -10,7 +10,7 @@ class EvolutionState:
     """演化引擎的运行状态。"""
 
     status: str = "idle"
-    """当前状态: idle / running / optimizing / diagnosing / modifying / done / error"""
+    """当前状态: idle / running / optimizing / diagnosing / modifying / completed / failed"""
 
     current_version: int = 0
     best_cost: float = float("inf")

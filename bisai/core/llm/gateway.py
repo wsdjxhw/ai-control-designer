@@ -107,7 +107,7 @@ class LLMClient:
         """
         调用 LLM，返回完整内容（流式收集）
         """
-        max_tokens = kwargs.get('max_tokens', 2000)
+        max_tokens = kwargs.get('max_tokens', 30000)
         temperature = kwargs.get('temperature', self.temperature)
         extra_body = {**self.extra_body, **kwargs.get('extra_body', {})}
         stop = kwargs.get('stop')

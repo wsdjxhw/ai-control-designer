@@ -1,14 +1,18 @@
 # ============================================
-# 诊断报告通用模板
-# 用途：让LLM基于 metrics 生成结构化诊断报告
+# 诊断报告通用模板（中文版）
+# 用途：让 LLM 基于 metrics 生成结构化诊断报告
 # ============================================
 
-You are a control theory expert specializing in PDE-constrained optimal control and iterative black-box optimization.
-Below are the numerical metrics of the **current** optimization round and the full evolutionary history.
+你是一位控制系统理论专家，精通 PDE 约束最优控制与迭代式黑箱优化。
+以下是**当前**优化轮次的数值指标以及完整的演化历史。
 
 {{history_section}}
 
-## Current Version Metrics
+**如果上面的历史部分为空（首轮），请直接跳过第 5、6 节（历史经验/相似性对比），
+不要输出"请补充历史数据"之类的说明，直接基于当前版本的指标产出第 1、2、3、4、7 节。**
+
+
+## 当前版本的指标
 {{metrics_text}}
 
 {{history_skip_note}}
@@ -17,85 +21,83 @@ Below are the numerical metrics of the **current** optimization round and the fu
 
 ---
 
-## Your Tasks
+## 你的任务
 
-### 1. Executive Summary
-State the **single most critical issue** that persists across versions. Quantify its impact in one sentence.
+### 1. 执行摘要（Executive Summary）
+指出跨多个版本持续存在的**最关键问题**。用一句话量化它的影响。
 
-### 2. Parameter Bound Analysis
-- List parameters at or near their bounds (within 5%).
-- Flag parameters whose optimal value **flips sign** across versions, and explain what this suggests about their physical meaning.
-- **For parameters hitting bounds or whose range appears suboptimal, use this exact format:**
-  `APPLY_BOUND: param_name (new_low, new_high) — <physical justification>`
+### 2. 参数边界分析（Parameter Bound Analysis）
+- 列出达到边界或接近边界（误差 5% 以内）的参数。
+- 标出最优值在多个版本间**符号翻转**的参数，并解释这反映了其物理意义上的什么特性。
 
-### 3. Control Activity Analysis
-- Rank controls by contribution to total cost.
-- Identify over-actuation (multiple controls fighting) or under-utilization (cheap controls not being used).
-- Flag controls stuck at max or zero throughout.
+### 3. 控制作用分析（Control Activity Analysis）
+- 按对总代价的贡献对各个控制量排序。
+- 识别"过度作用"（多个控制量互相打架）或"利用不足"（代价便宜的控制量却未使用）。
+- 标出始终卡在最大值或恒为零的控制量。
 
-### 4. State Deviation Analysis
-- Rank deviations by magnitude and persistence.
-- **CRITICAL — Cross-state anti-correlation detection:**
-  Check whether improvements in one state deviation systematically coincide with degradations in another. If such a pattern exists:
-  * Report the quantitative evidence (which states, across which versions).
-  * If you have high confidence in a specific explanation, state it with supporting evidence from the data.
-  * If multiple explanations are plausible and the data is ambiguous, list them all without committing to one.
-  * If you find no convincing evidence of coupling, explicitly state "No systematic cross-state coupling detected".
-  * Regardless of confidence, state whether this coupling is likely resolvable by parameter tuning alone, or requires a structural change.
+### 4. 状态偏差分析（State Deviation Analysis）
+- 按偏差的大小和持续时间排序。
+- **关键——跨状态反相关性检测：**
+  检查一个状态偏差的改善是否系统性地伴随另一个状态的恶化。如果存在这种模式：
+  * 报告定量证据（哪些状态、在哪些版本间）。
+  * 如果对某个具体解释有高置信度，给出该解释及数据支撑。
+  * 如果有多个合理解释且数据不明确，全部列出但不要指定其中某一个。
+  * 如果没有发现令人信服的状态耦合证据，请明确写出"未检测到系统性的跨状态耦合"。
+  * 无论置信度高低，都要说明这种耦合**是否可能仅靠参数调优解决**，还是必须做结构性改动。
 
-### 5. Historical Lessons Summary
+### 5. 历史经验总结（Historical Lessons Summary）
 
-**Step 1 — Classify every significant past modification:**
-- ✅ EFFECTIVE: Reduced total cost without degrading constraints.
-- ⚠️ TRADE-OFF: Improved some states but worsened others or increased cost.
-- ❌ INEFFECTIVE: Worsened both cost and constraints.
-- 🔒 PRESERVED: Mechanisms that have clearly solved a previously persistent deviation. Explicitly state: "These should NOT be altered in the next version."
+**第 1 步——分类每一次重要的历史修改：**
+- ✅ 有效（EFFECTIVE）：在不恶化约束的前提下降低了总代价。
+- ⚠️ 权衡（TRADE-OFF）：改善了一些状态但恶化了其他状态或提高了总代价。
+- ❌ 无效（INEFFECTIVE）：代价和约束都变差。
+- 🔒 保留（PRESERVED）：已明确解决某个长期存在的偏差的机制。请明确写出："下一版本中不应改动这些机制。"
 
-**Step 2 — Extract REPEATED FAILURE PATTERNS (meta-analysis):**
-Identify cross-version patterns where the same **type** of modification keeps failing. For each pattern you identify:
-- Name it descriptively.
-- Describe its defining characteristics.
-- List the specific versions and modifications that exemplify it.
-- Explain why this type of modification has been structurally ineffective.
+**第 2 步——提取重复失败模式（REPEATED FAILURE PATTERNS，元分析）：**
+识别跨多个版本中，同一**类型**的修改反复失败的规律。对每个识别出的模式：
+- 为它起一个描述性的名字。
+- 描述它的典型特征。
+- 列出具体哪些版本、哪些修改属于这个模式。
+- 解释为什么这类修改在结构上一直无效。
 
-**Step 3 — Identify RECURRING SUCCESSFUL STRATEGIES:**
-Similarly, identify design strategies that have produced improvements across multiple versions. For each:
-- Describe the strategy and name it.
-- List the versions where it was applied and the resulting improvements.
-- State whether this strategy appears to be a general design principle.
+**第 3 步——识别反复成功的策略（RECURRING SUCCESSFUL STRATEGIES）：**
+同样地，识别在多个版本中产生改善的设计策略。对每个策略：
+- 描述该策略并为其命名。
+- 列出应用该策略的版本及带来的改善。
+- 说明该策略是否看起来是一个通用的设计原则。
 
-### 6. Similarities Between Current and Past Issues
+### 6. 当前问题与历史问题的相似性（Similarities Between Current and Past Issues）
 
-Fill this table:
+填写下表：
 
-| Current Issue | Similar Past Issue (Version #) | Root Cause Overlap | What Was Tried | What Was Learned | Why Repeating Would Fail |
+| 当前问题 | 相似的历史问题（版本号） | 根因重叠 | 曾经尝试过什么 | 学到了什么 | 为什么重复会失败 |
 |:---|:---|:---|:---|:---|:---|
-| ... | VX | Identical / Partial / None | ... | ... | ... |
+| ... | VX | 完全相同 / 部分相同 / 无 | ... | ... | ... |
 
-### 7. Structural Modification Suggestions
+### 7. 结构性修改建议（Structural Modification Suggestions）
 
-**SCOPE CONSTRAINT**: All modifications must be implementable by changing only the `control_law(t, x, state, params)` function.
+**范围约束**：所有修改必须仅通过改动 `control_law(t, x, state, params)` 函数即可实现。
 
-Propose **3–5 structural changes** (not mere parameter tuning). For each:
-- **What** — precise structural modification.
-- **Why** — physical/control-theoretic rationale.
-- **Why this avoids past failures** — explicitly name the REPEATED FAILURE PATTERN.
-- **Expected impact** — on cost, state deviations, and parameter count.
-- **Risk & mitigation** — what could go wrong and how to guard against it.
+提出 **3–5 个结构性修改建议**（不是单纯的参数调优）。对每一条：
+- **改什么（What）** —— 精确的结构性修改内容。
+- **为什么（Why）** —— 物理或控制理论上的依据。
+- **为什么这样能避开过去的失败** —— 明确指出是哪一类 REPEATED FAILURE PATTERN。
+- **预期影响（Expected impact）** —— 对总代价、状态偏差、参数数量的影响。
+- **风险与缓解（Risk & mitigation）** —— 可能出现什么问题，如何防范。
 
-After all proposals, rank them:
+所有建议列完后，进行优先级排序：
 
-| Priority | Modification (1-line) | Expected Cost Impact | Risk Level |
+| 优先级 | 修改建议（一行描述） | 预期代价影响 | 风险等级 |
 |----------|----------------------|---------------------|------------|
 | 1 | ... | ... | ... |
 
-### 8. Parameter Declaration Completeness
-- If `[PARAM DECLARATION MISSING]` appears, list missing parameters with suggested ranges.
-- Flag naming inconsistencies across versions.
+### 8. 参数声明完整性（Parameter Declaration Completeness）
+- 如果出现 `[PARAM DECLARATION MISSING]` 标记，列出缺失的参数及建议的取值范围。
+- 标出跨版本命名不一致的参数。
 
 ---
 
-## Output Format
-- Use clear section headers matching the numbering above.
-- Be specific and quantitative. Never say "consider adjusting X".
-- Reference version numbers when discussing history.
+## 输出格式要求
+- 使用与上面编号一致、清晰的章节标题。
+- 具体且量化。绝不要说"可以考虑调整 X"这类模糊的话。
+- 在讨论历史时引用具体的版本号。

@@ -1,0 +1,126 @@
+[
+  {
+    "version": 1,
+    "timestamp": "2026-10-02T20:59:34.223030",
+    "params": {
+      "kd": 18.727005942368123,
+      "kp": 95.07143064099162,
+      "ff_gain": 36.59969709057025,
+      "ki": 29.93292420985183
+    },
+    "cost": 1873.872378377675,
+    "param_count": 4,
+    "diagnosis_summary": "# 诊断报告\n\n> ⚠️ **数据缺失声明**：本报告收到的输入中，**Evolution History Summary（演化历史）一节为空**。这意味着第 5、6、7 节中的\"跨版本比较\"只能基于当前轮次的指标做单点推断，无法验证历史模式。下面凡涉及\"历史\"的结论，均明确标注为单点推断或无法核实。\n\n---\n\n## 1. 执行摘要（Executive Summary）\n\n**核心问题**：状态 `omega`（角速度）严重发散，最终均值偏移达 **+10.9**，峰值偏差 **100.0**（满量程），全程累积偏差 **39,715**——比状态 `current` 的累积偏差（**6.5**）高出约 **6,100 倍**。系统本质上是 `omega` 单状态失稳，`current` 几乎被控制住。整个控制代价（**60.0**，总电压）已压在 **控制上限**（均值 12.0 = 满量程），属于**硬饱和**——继续\"加大力度\"在物理上已无空间。**一句话量化**：在控制力已饱和的前提下，omega 单状态仍贡献了 >99.98% 的总累积偏差，必须靠**结构性**（而非参数）",
+    "metrics": {
+      "state_stats": {
+        "omega": {
+          "final_mean": 10.90909090909091,
+          "final_deviation": 89.0909090909091,
+          "max_deviation": 100.0,
+          "integrated": 39715.28560613835
+        },
+        "current": {
+          "final_mean": 1.0909090909090908,
+          "final_deviation": 1.0909090909090908,
+          "max_deviation": 3.916732954002175,
+          "integrated": 6.499533074825675
+        }
+      },
+      "control_stats": {
+        "voltage": {
+          "mean_usage": 12.0,
+          "max_usage": 12.0,
+          "total_integrated": 60.0
+        }
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "version": 2,
+    "timestamp": "2026-10-02T21:02:02.706000",
+    "params": {
+      "kd": 18.727005942368123,
+      "ki": 47.53571532049581,
+      "ff_gain": 36.59969709057025,
+      "kd_omega": 29.93292420985183,
+      "omega_weight": 1.5601864044243652,
+      "current_weight": 1.5599452033620265,
+      "kff_omega": 2.9041806084099733,
+      "kp": 86.61761457749351,
+      "ki_omega": 30.05575058716044
+    },
+    "cost": 1873.872378377675,
+    "param_count": 9,
+    "diagnosis_summary": "I'll analyze the optimization data and generate a structured diagnostic report. Let me first organize the information clearly.Now let me write the complete diagnostic report based on the metrics provided.报告已生成完毕。给你快速过一下核心结论：\n\n**核心问题（一句话）**：V1 处于\"**高增益 + 控制饱和 + 状态发散**\"的失效区——4 个参数全部异常高、`voltage` 死锁在上限 12、`omega` 峰值偏差顶到满量程 100、累积偏差 39,715 是 `current` 的 6,100 倍。\n\n**关键发现**：\n- 🔴 **控制饱和是头号杀手**——`mean=12.0 / total=60.0` 自洽说明 voltage 在 5 步内**每一步**都被钉死在最大值 12。在这种状态下，单纯调 kp/ki/kd/ff_gain 几乎没有意义（梯度消失）。\n- 🟡 ",
+    "metrics": {
+      "state_stats": {
+        "omega": {
+          "final_mean": 10.90909090909091,
+          "final_deviation": 89.0909090909091,
+          "max_deviation": 100.0,
+          "integrated": 39715.28560613835
+        },
+        "current": {
+          "final_mean": 1.0909090909090908,
+          "final_deviation": 1.0909090909090908,
+          "max_deviation": 3.916732954002175,
+          "integrated": 6.499533074825675
+        }
+      },
+      "control_stats": {
+        "voltage": {
+          "mean_usage": 12.0,
+          "max_usage": 12.0,
+          "total_integrated": 60.0
+        }
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "version": 3,
+    "timestamp": "2026-10-02T21:04:00.517033",
+    "params": {
+      "kd": 29.264458930102492,
+      "ki": 37.37309371197579,
+      "ff_gain": 24.469802583399517,
+      "kd_omega": 5.643231624697329,
+      "omega_weight": 8.904122549782139,
+      "current_weight": 1.4813513379711636,
+      "slew_rate": 1.7559719113303949,
+      "v_max": 21.408622998210067,
+      "kff_omega": 14.70307668066922,
+      "tau_aw": 1.1316314614438305,
+      "kp": 45.17645683636501,
+      "ki_omega": 30.071533167069713
+    },
+    "cost": 0.0006166874706762644,
+    "param_count": 12,
+    "diagnosis_summary": "# 诊断报告\n\n> ⚠️ **数据可信度声明**：本报告输入数据存在严重内部不一致——\n> - 同一 `cost=1873.8724` 在 V1 和 V2 重复出现\n> - 当前轮次指标显示 `current` 状态 `final_dev=0.0000, integrated_dev=0.0000`，但 V1 诊断摘要中却显示 current 累积偏差为 6.5\n> - V2 描述 \"voltage 死锁在上限\"，但当前指标 `voltage mean=-0.0351` 完全未饱和\n> - 跨版本比较的结论**仅基于 2 个数据点**，统计意义极低\n\n---\n\n## 1. 执行摘要（Executive Summary）\n\n**核心问题（量化）**：状态 `omega` 的累积偏差达 **50,000**（满量程 × 全程），最大偏差 **100.0**（满量程），且 `final_dev=100.0000`——`omega` 状态**完全未受控**，与基准值的偏差稳定在 100% 量程。状态 `current` 则完全归零（`final_dev=0.0000`）。两个状态之间的能量分配",
+    "metrics": {
+      "state_stats": {
+        "omega": {
+          "final_mean": 0.0,
+          "final_deviation": 100.0,
+          "max_deviation": 100.0,
+          "integrated": 50000.0
+        },
+        "current": {
+          "final_mean": 0.0,
+          "final_deviation": 0.0,
+          "max_deviation": 0.0,
+          "integrated": 0.0
+        }
+      },
+      "control_stats": {
+        "voltage": {
+          "mean_usage": -0.035119438226607895,
+          "max_usage": -0.035119438226607895,
+          "total_integrated": -0.17559719113303945
+        }
+      },
+      "anomalies": []
+    }
+  }
+]

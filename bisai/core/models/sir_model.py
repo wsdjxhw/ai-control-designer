@@ -57,13 +57,13 @@ class SIRModel(BaseModel):
         return self._control_dim
 
     def get_initial_state(self) -> np.ndarray:
-        """初始状态：990 易感、10 感染、0 康复、0 隔离。"""
+        """初始状态：S=990, I=10, R=0, Q=0（兼容 S/S0 两种命名）"""
         init = self._scene_config.get("initial_state", {})
         return np.array([
-            init.get("S0", 990.0),
-            init.get("I0", 10.0),
-            init.get("R0", 0.0),
-            init.get("Q0", 0.0),
+            init.get("S", init.get("S0", 990.0)),
+            init.get("I", init.get("I0", 10.0)),
+            init.get("R", init.get("R0", 0.0)),
+            init.get("Q", init.get("Q0", 0.0)),
         ], dtype=float)
 
     def rhs(self, t: float, state: np.ndarray, control: np.ndarray) -> np.ndarray:

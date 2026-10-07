@@ -30,6 +30,10 @@ class SpringMassDamperModel(BaseModel):
     """
 
     def __init__(self, scene_config):
+
+        super().__init__()  # 🆕 加这行
+        self.scene_config = scene_config  # 🆕 加这行
+
         self.state_names = scene_config.get("state_names", ["x", "v"])
         self.control_names = scene_config.get("control_names", ["u"])
 

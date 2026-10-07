@@ -1,61 +1,60 @@
 # ============================================
-# 代码修改通用模板（跨领域版 v4 - 带场景上下文）
+# 代码修改通用模板（跨领域版 v5 - 中文版 - 带场景上下文）
 # ============================================
 
-You are an expert in control theory and scientific computing.
-Below are the scene context, evolutionary history, current control law code,
-and diagnostic report. Please modify the code to generate a new version.
+你是一位精通控制理论与科学计算的专家。
+下面是场景上下文、演化历史、当前控制律代码以及诊断报告。
+请修改代码以生成新版本。
 
-===== SCENE CONTEXT (HIGHEST PRIORITY) =====
+===== 场景上下文（SCENE CONTEXT，最高优先级） =====
 {{scene_context}}
 
-===== EVOLUTIONARY HISTORY SUMMARY =====
+===== 演化历史摘要（EVOLUTIONARY HISTORY SUMMARY） =====
 {{history_summary}}
 
-===== CURRENT CONTROL LAW CODE (READ CAREFULLY) =====
+===== 当前控制律代码（CURRENT CONTROL LAW CODE，请仔细阅读） =====
 {{current_code}}
 
-===== DIAGNOSTIC REPORT =====
+===== 诊断报告（DIAGNOSTIC REPORT） =====
 {{diagnosis_report}}
 
-===== EXISTING CODE CONTEXT (MUST PRESERVE) =====
+===== 现有代码上下文（EXISTING CODE CONTEXT，必须保留） =====
 
-Before writing the new version, carefully analyze the current control law above.
+在编写新版本之前，请仔细分析上面的当前控制律代码。
 
-[1] RETURN SHAPE
-The SCENE CONTEXT section specifies EXACTLY how many columns the return value
-must have. Follow that number, NOT what you see in the current code (the current
-code may be buggy).
+[1] 返回形状（RETURN SHAPE）
+"场景上下文"部分明确规定了返回值必须有多少列。
+请严格遵循该数量，**不要**照抄当前代码里的列数（当前代码可能有 bug）。
 
-[2] CONTROL TYPE (CRITICAL)
-The SCENE CONTEXT section specifies the control type (continuous or bang-bang).
-Follow that. Do NOT switch types unless the diagnostic report explicitly says to.
+[2] 控制类型（CONTROL TYPE，关键）
+"场景上下文"部分规定了控制类型（continuous 或 bang-bang）。
+请严格遵循。**除非**诊断报告明确指出要切换，否则不要更改类型。
 
-[3] PARAMETER NAMING CONVENTION
-Preserve existing parameter names: gain_theta, gain_omega, kp, kd, max_torque, etc.
-Only add new names when genuinely needed.
-Do NOT rename existing parameters without strong reason.
+[3] 参数命名约定（PARAMETER NAMING CONVENTION）
+保留现有参数名：如 gain_theta、gain_omega、kp、kd、max_torque 等。
+只有在确实需要时，才添加新的参数名。
+**除非有充分理由，否则不要重命名现有参数。**
 
-[4] SIMULATION CONSTANTS
-Do NOT hardcode T, dt, or any other simulation constant.
-Use the values from SCENE CONTEXT.
+[4] 仿真常量（SIMULATION CONSTANTS）
+**不要**硬编码 T、dt 或任何其他仿真常量。
+使用"场景上下文"中给出的值。
 
-===== MODIFICATION REQUIREMENTS =====
+===== 修改要求（MODIFICATION REQUIREMENTS） =====
 
-1. Read the history summary carefully to avoid repeating failed modifications.
-2. If a parameter was adjusted multiple times without resolving the issue,
-   consider changing the control law STRUCTURE instead.
-3. Prefer structural combinations of existing parameters over blindly adding new ones.
-4. Explain in code comments how this modification avoids past failures.
-5. Your new code MUST be consistent with the SCENE CONTEXT section.
+1. 仔细阅读演化历史摘要，避免重复此前失败的修改。
+2. 如果某个参数被反复调整多次仍未解决问题，
+   请考虑修改控制律的**结构**而非继续调参。
+3. 优先考虑**已有参数的结构性组合**，而不是盲目添加新参数。
+4. 在代码注释中说明本次修改如何避开了过去的失败模式。
+5. 新代码**必须**与"场景上下文"部分保持一致。
 
-===== VECTORIZATION SAFETY (HIGHEST PRIORITY) =====
+===== 向量化安全（VECTORIZATION SAFETY，最高优先级） =====
 {{vectorization_rules}}
 
-===== PARAMETER DECLARATION BLOCK (REQUIRED) =====
+===== 参数声明块（PARAMETER DECLARATION BLOCK，必需） =====
 
-Immediately after the self-check comment block, before the control_law function,
-include a block exactly like this (use # comments, NOT a code block):
+紧接在自检注释块之后、control_law 函数之前，
+必须包含一个完全如下格式的声明块（用 # 注释，**不要**用代码块）：
 
 # ========== PARAM DECLARATION ==========
 # @param: param_1 (0.1, 10.0)
@@ -63,13 +62,13 @@ include a block exactly like this (use # comments, NOT a code block):
 # @param: param_3 (-2.0, 2.0)
 # ========== END PARAM DECLARATION ==========
 
-List EVERY tunable parameter used in your control law.
-THIS BLOCK IS MANDATORY.
+列出控制律中用到的**每一个**可调参数。
+**此声明块为强制要求。**
 
-===== OUTPUT FORMAT HARD REQUIREMENTS =====
+===== 输出格式硬性要求（OUTPUT FORMAT HARD REQUIREMENTS） =====
 
-- Output ONLY the complete Python code.
-- Must include "import numpy as np" and the "control_law" function definition.
-- The self-check comment block must be at the top.
-- Do NOT output any explanatory text outside the code.
-- Return shape and control type MUST match SCENE CONTEXT.
+- **只输出**完整的 Python 代码。
+- 必须包含 "import numpy as np" 以及 "control_law" 函数定义。
+- 自检注释块必须位于**最顶部**。
+- **不要**在代码之外输出任何解释性文字。
+- 返回形状和控制类型**必须**与"场景上下文"一致。

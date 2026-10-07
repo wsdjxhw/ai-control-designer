@@ -60,6 +60,96 @@ def extract_code_from_response(content: str) -> Optional[str]:
     return None
 
 
+
+
+def smoke_test_control_law(
+    code: str,
+    scene_config: dict,
+) -> tuple[bool, str | None]:
+    """
+    对控制律代码做烟雾测试：
+      1. 编译执行代码
+      2. 用占位参数调用 control_law(0, x_dummy, state_dummy, params_dummy)
+      3. 检查返回形状
+    
+    Returns:
+        (True, None) 通过
+        (False, error_msg) 失败，error_msg 是具体错误
+    """
+    import numpy as np
+
+    # 1. 编译
+    namespace = {"np": np}
+    try:
+        exec(compile(code, "<smoke_test>", "exec"), namespace)
+    except Exception as e:
+        return False, f"编译失败: {type(e).__name__}: {e}"
+
+    func = namespace.get("control_law")
+    if func is None:
+        return False, "未定义 control_law 函数"
+
+    # 2. 构造假输入
+    state_names = scene_config.get("state_names", [])
+    control_names = scene_config.get("control_names", [])
+    model_type = scene_config.get("model_type", "ode")
+
+    state_dim = len(state_names) or 2
+    control_dim = len(control_names) or 1
+
+    # PDE 用 (M+1, state_dim)，ODE 用 (state_dim,)
+    spatial = scene_config.get("spatial", {})
+    if model_type == "pde" and spatial:
+        X = spatial.get("X", 2.0)
+        dx = spatial.get("dx", 0.1)
+        M_plus_1 = int(X / dx) + 1
+        state = np.random.rand(M_plus_1, state_dim)
+        x_grid = np.linspace(0, X, M_plus_1)
+    else:
+        state = np.random.rand(state_dim)
+        x_grid = np.array([0.0])
+
+    # 3. 从 # @param 提取参数名，给默认值
+    params = {}
+    import re
+    for m in re.finditer(r'#\s*@param:?\s+(\w+)\s*\(\s*([-\d.eE+]+)\s*,\s*([-\d.eE+]+)', code):
+        name = m.group(1)
+        low = float(m.group(2))
+        high = float(m.group(3))
+        params[name] = (low + high) / 2
+
+    # 4. 调用
+    try:
+        result = func(0.0, x_grid, state, params)
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        # 只取最后一行错误信息
+        last_line = tb.strip().split('\n')[-1]
+        return False, f"运行时错误: {last_line}"
+
+    # 5. 检查返回值
+    result = np.asarray(result)
+    if result.ndim == 0:
+        return False, f"返回值是标量，期望 shape 与 control_dim={control_dim} 相关"
+    
+    if model_type == "pde":
+        if result.shape != (M_plus_1, control_dim):
+            return False, f"PDE 返回值 shape={result.shape}，期望 ({M_plus_1}, {control_dim})"
+    else:
+        if result.size != control_dim and result.shape != (control_dim,):
+            return False, f"ODE 返回值 shape={result.shape}，期望 ({control_dim},)"
+
+    return True, None
+
+
+
+
+
+
+
+
+
 def _looks_like_python_code(text: str) -> bool:
     """判断一段文本是否直接是可执行的 Python 代码"""
     if not text:

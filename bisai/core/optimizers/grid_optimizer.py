@@ -34,23 +34,28 @@ class GridOptimizer(BaseOptimizer):
         实际使用时建议用 Random 或 TPE 替代。
         """
 
-        def optuna_objective(trial):
-            params = {}
-            for name, (low, high) in param_bounds.items():
-                params[name] = trial.suggest_float(name, low, high)
-            return objective(params)
-
-        # GridSampler 需要预定义 search_space
-        # 这里简化为使用较小的步长
+        # 🆕 先构造离散网格（移到 optuna_objective 之前）
         search_space = {}
         n_params = len(param_bounds)
-        n_points_per_param = max(3, int((n_trials ** (1 / n_params))))
+        if n_params == 0:
+            return {}, float("inf"), []
+
+        n_points_per_param = max(3, int((n_trials ** (1.0 / n_params))))
 
         for name, (low, high) in param_bounds.items():
             search_space[name] = [
                 low + (high - low) * i / (n_points_per_param - 1)
                 for i in range(n_points_per_param)
             ]
+
+        def optuna_objective(trial):
+            params = {}
+            for name in param_bounds.keys():
+                # 🆕 用 suggest_categorical 从预先定义的离散点里选
+                params[name] = trial.suggest_categorical(name, search_space[name])
+            return objective(params)
+
+
 
         study = optuna.create_study(
             sampler=optuna.samplers.GridSampler(search_space)

@@ -1,0 +1,122 @@
+[
+  {
+    "version": 1,
+    "timestamp": "2026-10-03T11:12:00.916212",
+    "params": {
+      "target_theta": 7.479826145079671,
+      "kp": 22.06142856735199,
+      "ki": 4.868537045026882,
+      "target_omega": 0.7139387492825583,
+      "kd": 15.539516792815245
+    },
+    "cost": 285.6812773021181,
+    "param_count": 5,
+    "diagnosis_summary": "# 控制系统诊断报告\n\n## 1. 执行摘要（Executive Summary）\n\n**最关键问题**：θ状态持续偏离目标值（final_mean=9.3651，偏差达9.5），且ω状态存在持续振荡（integrated_dev=42.44），表明系统在**稳态精度**与**动态稳定性**之间存在根本性矛盾。该问题导致总代价中状态偏差贡献占比超过90%，控制作用仅贡献约10%，说明当前控制策略在**抑制状态偏差方面严重失效**。\n\n---\n\n## 2. 参数边界分析（Parameter Bound Analysis）\n\n### 2.1 达到边界或接近边界的参数\n\n| 参数 | 当前值 | 边界 | 边界类型 | 距边界误差 |\n|:---|:---|:---|:---|:---|\n| θ final_mean | 9.3651 | 9.5 | 上界 | 1.4% |\n| θ max_dev | 9.5000 | 9.5 | 上界 | **0%（触及）** |\n| ω final_dev | 2.0000 | 2.0 | 上界 | **0%（触及）** |\n| ω max_dev | ",
+    "metrics": {
+      "state_stats": {
+        "theta": {
+          "final_mean": 9.365145816498163,
+          "final_deviation": 0.6348541835018366,
+          "max_deviation": 9.5,
+          "integrated": 119.86231391601964
+        },
+        "omega": {
+          "final_mean": 0.0,
+          "final_deviation": 2.0,
+          "max_deviation": 5.966472777437194,
+          "integrated": 42.44059173153832
+        }
+      },
+      "control_stats": {
+        "torque": {
+          "mean_usage": -4.488707457140134,
+          "max_usage": 10.0,
+          "total_integrated": -44.931961645972734
+        }
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "version": 2,
+    "timestamp": "2026-10-03T11:15:05.893897",
+    "params": {
+      "target_theta": 7.378639838836393,
+      "kp": 18.83521581067554,
+      "ki": 5.83140062755862,
+      "max_torque": 20.823923339416915,
+      "integral_limit": 88.37651596800144,
+      "target_omega": 0.00532892835893084,
+      "kd": 16.284379143822388
+    },
+    "cost": 285.2278514784278,
+    "param_count": 7,
+    "diagnosis_summary": "# 控制系统诊断报告\n\n## 1. 执行摘要（Executive Summary）\n\n**最关键问题**：θ状态持续偏离目标值（final_mean=9.2883，偏差达9.3），且ω状态存在持续振荡（integrated_dev=38.99），表明系统在**稳态精度**与**动态稳定性**之间存在根本性矛盾。该问题导致总代价中状态偏差贡献占比超过90%，控制作用仅贡献约10%，说明当前控制策略在**抑制状态偏差方面严重失效**。\n\n---\n\n## 2. 参数边界分析（Parameter Bound Analysis）\n\n### 2.1 达到边界或接近边界的参数\n\n| 参数 | 当前值 | 边界 | 状态 |\n|:---|:---|:---|:---|\n| target_theta | 7.4798 | 未提供 | 需确认 |\n| kp | 22.0614 | 未提供 | 需确认 |\n| ki | 4.8685 | 未提供 | 需确认 |\n| target_omega | 0.7139 | 未提供 | 需确认 |\n| kd | 15.5395 | 未提供 | 需确认 |\n\n**注意**",
+    "metrics": {
+      "state_stats": {
+        "theta": {
+          "final_mean": 9.288273017561446,
+          "final_deviation": 0.7117269824385541,
+          "max_deviation": 9.5,
+          "integrated": 121.82455714013106
+        },
+        "omega": {
+          "final_mean": 0.0,
+          "final_deviation": 2.0,
+          "max_deviation": 5.089022545579306,
+          "integrated": 38.98556613816339
+        }
+      },
+      "control_stats": {
+        "torque": {
+          "mean_usage": -4.220597901576781,
+          "max_usage": 10.0,
+          "total_integrated": -42.24818499478358
+        }
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "version": 3,
+    "timestamp": "2026-10-03T11:18:16.635478",
+    "params": {
+      "target_theta": 4.606359489642959,
+      "kp": 19.479142140860002,
+      "integral_separation_threshold": 4.4829297991464925,
+      "ki": 4.669049351620062,
+      "feedforward_gain": 2.913251513783472,
+      "max_torque": 16.867800358782404,
+      "integral_limit": 62.57460447170398,
+      "target_omega": 5.650945272854986,
+      "kd": 14.203151180302829
+    },
+    "cost": 229.6870862882509,
+    "param_count": 9,
+    "diagnosis_summary": "# 控制系统诊断报告\n\n## 1. 执行摘要（Executive Summary）\n\n**最关键问题**：θ状态持续偏离目标值（final_mean=9.4843，偏差达9.5），且ω状态存在持续振荡（integrated_dev=43.47），表明系统在**稳态精度**与**动态稳定性**之间存在根本性矛盾。该问题导致总代价中状态偏差贡献占比超过90%，控制作用仅贡献约10%，说明当前控制策略在**抑制状态偏差方面严重失效**。\n\n---\n\n## 2. 参数边界分析（Parameter Bound Analysis）\n\n### 2.1 达到边界或接近边界的参数\n\n| 参数 | 当前值 | 边界 | 状态 |\n|:---|:---|:---|:---|\n| `target_theta` | 7.38 | 接近下界 | 接近边界（V2） |\n| `target_omega` | 0.0053 | 接近下界 | 接近边界（V2） |\n| `max_torque` | 20.82 | 接近上界 | 接近边界（V2） |\n\n### 2.2 符号翻转参数\n\n| 参数 | V1值 | V2值 | ",
+    "metrics": {
+      "state_stats": {
+        "theta": {
+          "final_mean": 9.484280651833702,
+          "final_deviation": 0.5157193481662983,
+          "max_deviation": 9.5,
+          "integrated": 120.42763172047106
+        },
+        "omega": {
+          "final_mean": 0.0017706947154115036,
+          "final_deviation": 1.9982293052845885,
+          "max_deviation": 6.22052990404773,
+          "integrated": 43.469122485889145
+        }
+      },
+      "control_stats": {
+        "torque": {
+          "mean_usage": 1.5513252440485341,
+          "max_usage": 10.0,
+          "total_integrated": 15.48168854875735
+        }
+      },
+      "anomalies": []
+    }
+  }
+]

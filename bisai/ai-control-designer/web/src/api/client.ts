@@ -70,6 +70,25 @@ export const getActiveRun = (
 ): Promise<{ active: boolean; run_id: string | null }> =>
   api.get(`/projects/${projectId}/active-run`);
 
+export const getLatestRun = (
+  projectId: string
+): Promise<{ has_run: boolean; run_id: string | null; status: string | null }> =>
+  api.get(`/projects/${projectId}/latest-run`);
+
+// 🆕 基线评估相关
+export interface BaselineInfo {
+  type: string;
+  control_law_code: string;
+  params: Record<string, number>;
+  cost: number;
+}
+
+export const reevaluateBaseline = (
+  projectId: string,
+  params: Record<string, number>
+): Promise<{ success: boolean; baseline: BaselineInfo }> =>
+  api.post(`/projects/${projectId}/baseline/reevaluate`, { params });
+
 export interface ProjectVersionDetail {
   project_id: string;
   version: number;

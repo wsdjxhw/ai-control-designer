@@ -1,0 +1,9 @@
+===== V2 演化诊断报告 =====
+本轮代价: 1873.872378
+I'll analyze the optimization data and generate a structured diagnostic report. Let me first organize the information clearly.Now let me write the complete diagnostic report based on the metrics provided.报告已生成完毕。给你快速过一下核心结论：
+
+**核心问题（一句话）**：V1 处于"**高增益 + 控制饱和 + 状态发散**"的失效区——4 个参数全部异常高、`voltage` 死锁在上限 12、`omega` 峰值偏差顶到满量程 100、累积偏差 39,715 是 `current` 的 6,100 倍。
+
+**关键发现**：
+- 🔴 **控制饱和是头号杀手**——`mean=12.0 / total=60.0` 自洽说明 voltage 在 5 步内**每一步**都被钉死在最大值 12。在这种状态下，单纯调 kp/ki/kd/ff_gain 几乎没有意义（梯度消失）。
+- 🟡 

@@ -6,6 +6,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from backend.src.database import get_db
@@ -25,6 +26,223 @@ from backend.src.services.llm_config_service import (
 
 router = APIRouter(tags=["projects"])
 file_storage = FileStorageService()
+
+
+def _normalize_cost_function(config: dict) -> dict:
+    """
+    把前端 UI 的代价函数字段转换为 core 期望的 cost_function 子对象结构。
+    """
+    # 🆕 全局清洗 temporal（防止 None 传播到 4 个代价函数）
+    temporal = config.get("temporal") or {}
+    if not isinstance(temporal, dict):
+        temporal = {}
+
+    def _safe_float(v, default, must_be_positive=False):
+        if v is None:
+            return default
+        try:
+            f = float(v)
+            if must_be_positive and f <= 0:
+                return default
+            return f
+        except (ValueError, TypeError):
+            return default
+
+    temporal["T"] = _safe_float(temporal.get("T"), 5.0, must_be_positive=True)
+    temporal["dt"] = _safe_float(temporal.get("dt"), 0.01, must_be_positive=True)
+    temporal["n_steps"] = int(round(temporal["T"] / temporal["dt"]))
+    config["temporal"] = temporal
+    print(f"[normalize_cost] 清洗 temporal: T={temporal['T']}, dt={temporal['dt']}, "
+          f"n_steps={temporal['n_steps']}")
+
+    cost_type_ui = config.get("cost_function_type", "quadratic")
+    cost_weights = config.get("cost_weights", {}) or {}
+
+    state_names = config.get("state_names", [])
+    control_names = config.get("control_names", [])
+    target_values = config.get("target_values", {})
+
+
+        # ---- custom + 有表达式：走 expression / unified 模式 ----
+    cost_expr = config.get("cost_function_expression", "").strip() \
+        if isinstance(config.get("cost_function_expression"), str) else ""
+    terminal_expr = config.get("terminal_cost_expression", "").strip() \
+        if isinstance(config.get("terminal_cost_expression"), str) else ""
+    cost_computation = config.get("cost_computation", "both")
+
+    if cost_type_ui == "custom" and cost_expr:
+        symbols = {
+            "state": list(state_names),
+            "control": list(control_names),
+        }
+        if terminal_expr:
+            # 有 running + terminal 两个表达式 → expression 模式
+            config["cost_function"] = {
+                "cost_type": "expression",
+                "running_expr": cost_expr,
+                "terminal_expr": terminal_expr,
+                "symbols": symbols,
+                "has_terminal_cost": True,
+            }
+            print(f"[normalize_cost] → expression 模式 "
+                  f"(running_expr, terminal_expr, {len(state_names)} states, {len(control_names)} controls)")
+        else:
+            # 只有统一表达式 → unified 模式
+            integrate = cost_computation != "discrete"
+            config["cost_function"] = {
+                "cost_type": "unified",
+                "cost_expr": cost_expr,
+                "integrate_over_time": integrate,
+                "symbols": symbols,
+            }
+            print(f"[normalize_cost] → unified 模式 "
+                  f"(integrate={integrate}, {len(state_names)} states, {len(control_names)} controls)")
+        return config
+
+ 
+
+
+
+
+
+
+
+        # ---- 走 template 模式（quadratic / lqr / custom 无表达式）----
+    # 🆕 关键修复：不管 cost_weights 里有没有，都要给每个 state/control 分配权重
+    # 优先用 cost_weights 里的值，缺失的用默认值（state: 1.0, control: 0.1）
+    # ⚠️ 关键修复：target 必须是「名字」，TemplateCost 才会去 target_values 里查实际值
+    state_terms = {
+        name: {
+            "weight": float(cost_weights.get(name, 1.0)),
+            "target": name,  # ← 传名字，不是数字
+        }
+        for name in state_names
+    }
+    control_terms = {
+        name: {"weight": float(cost_weights.get(name, 0.1))}
+        for name in control_names
+    }
+
+    terminal_state_terms = {
+        name: {"weight": spec["weight"] * 10.0, "target": spec["target"]}
+        for name, spec in state_terms.items()
+    }
+
+    config["cost_function"] = {
+        "cost_type": "template",
+        "running_cost": {
+            "state_terms": state_terms,
+            "control_terms": control_terms,
+        },
+        "terminal_cost": {
+            "state_terms": terminal_state_terms,
+        },
+    }
+    print(f"[normalize_cost] → template 模式 "
+          f"(state_terms={len(state_terms)}, control_terms={len(control_terms)})")
+
+    return config
+
+
+
+def _evaluate_baseline_cost(
+    scene_config: dict,
+    control_law_code: str,
+    params: dict,
+    work_dir: str,
+) -> float:
+    """
+    用给定的控制律代码跑一次完整仿真，返回总代价。
+    用于 PID 等基线的评估。
+    """
+    from core.evolution.engine import EvolutionEngine, _compile_control_law
+
+    engine = EvolutionEngine(work_dir=work_dir, scene_config=scene_config)
+    ctrl_func = _compile_control_law(control_law_code)
+
+    t_arr, s_hist, c_hist = engine._simulate(ctrl_func, params)
+
+    # 累加运行代价
+    total = 0.0
+    n = len(t_arr)
+    for i in range(n):
+        total += engine.cost.compute_running(s_hist[i], c_hist[i], i)
+    # 加上终端代价
+    total += engine.cost.compute_terminal(s_hist[-1])
+
+    return float(total)
+
+
+class BaselineReevaluateRequest(BaseModel):
+    params: dict  # {"kp": ..., "ki": ..., "kd": ...}
+
+
+@router.post("/projects/{project_id}/baseline/reevaluate")
+async def reevaluate_baseline(
+        project_id: str,
+        req: BaselineReevaluateRequest,
+        db: Session = Depends(get_db),
+):
+    """用新的参数重新评估 PID 基线，更新 scene_config.baseline
+
+    用户可以在 UI 上调整 kp/ki/kd，然后点"重新评估"触发这个端点。
+    """
+    from core.baselines import generate_pid_control_law
+
+    project = db.query(Project).filter(Project.project_id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="项目不存在")
+
+    config = dict(project.scene_config or {})
+    if not config:
+        raise HTTPException(status_code=400, detail="项目没有 scene_config")
+
+    baseline_meta = config.get("baseline", {}) or {}
+    baseline_type = baseline_meta.get("type", "pid")
+
+    if baseline_type != "pid":
+        raise HTTPException(
+            status_code=400,
+            detail=f"当前基线类型 '{baseline_type}' 不支持参数重评估",
+        )
+
+    # 生成新的控制律代码
+    try:
+        new_code = generate_pid_control_law(config, req.params)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"生成控制律失败: {str(e)}")
+
+    # 重新跑一次仿真评估
+    work_dir = project.work_dir or str(file_storage.project_dir(project_id))
+    try:
+        new_cost = _evaluate_baseline_cost(config, new_code, req.params, work_dir)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"评估失败: {str(e)}")
+
+    # 更新 scene_config.baseline
+    config["baseline"] = {
+        "type": "pid",
+        "control_law_code": new_code,
+        "params": req.params,
+        "cost": new_cost,
+    }
+    project.scene_config = config
+    file_storage.save_scene_config(project_id, config)
+    db.commit()
+    db.refresh(project)
+
+    print(f"[reevaluate_baseline] 项目 {project_id[:8]}... 新 cost = {new_cost:.4f}")
+
+    return {
+        "success": True,
+        "baseline": config["baseline"],
+    }
+
+
+
+
 
 
 @router.post("/projects", response_model=ProjectResponse, status_code=201)
@@ -66,19 +284,32 @@ async def create_project(req: ProjectCreate, db: Session = Depends(get_db)):
             config["model_type"] = config.get("detected_type") or "ode"
             print(f"[create_project] 补齐 model_type = {config['model_type']}")
 
-        # 🆕 兜底 2：重算 n_steps（覆盖 LLM 给的 null 或错误值）
-        temporal = config.get("temporal", {})
-        T_val = temporal.get("T")
-        dt_val = temporal.get("dt")
-        if T_val and dt_val:
-            try:
-                dt_f = float(dt_val)
-                if dt_f > 0:
-                    temporal["n_steps"] = int(round(float(T_val) / dt_f))
-                    config["temporal"] = temporal
-                    print(f"[create_project] 重算 n_steps = {temporal['n_steps']} (T={T_val}, dt={dt_val})")
-            except (ValueError, TypeError) as e:
-                print(f"[create_project] n_steps 重算失败: {e}")
+        #         # 🆕 兜底 2：重算 n_steps（覆盖 LLM 给的 null 或错误值）
+        # temporal = config.get("temporal", {})
+        # T_val = temporal.get("T")
+        # dt_val = temporal.get("dt")
+        # if T_val and dt_val:
+        #     try:
+        #         dt_f = float(dt_val)
+        #         if dt_f > 0:
+        #             temporal["n_steps"] = int(round(float(T_val) / dt_f))
+        #             config["temporal"] = temporal
+        #             print(f"[create_project] 重算 n_steps = {temporal['n_steps']} (T={T_val}, dt={dt_val})")
+        #     except (ValueError, TypeError) as e:
+        #         print(f"[create_project] n_steps 重算失败: {e}")
+
+        # 🆕 兜底 3：把 UI 代价函数字段规范化为 core 期望的 cost_function 结构
+        config = _normalize_cost_function(config)
+
+        # 🆕 兜底 4a：如果用户没显式设置 enforce_nonnegative，按 state_names 自动推断
+        if "enforce_nonnegative" not in config:
+            state_names = config.get("state_names", [])
+            # 如果状态名包含 S/I/R/Q（SIR 类），默认开启非负约束
+            sir_indicators = {"S", "I", "R", "Q", "E", "Sus"}
+            auto_nonneg = any(s in sir_indicators for s in state_names)
+            config["enforce_nonnegative"] = auto_nonneg
+            print(f"[create_project] 自动推断 enforce_nonnegative = {auto_nonneg} (state_names={state_names})")
+
 
         # 🆕 关键：把 model_code 注入到 scene_config["_model_code"]
         if req.model_code and len(req.model_code.strip()) > 0:
@@ -89,6 +320,32 @@ async def create_project(req: ProjectCreate, db: Session = Depends(get_db)):
         if req.optimizer_config:
             config["optimizer"] = req.optimizer_config
             print(f"[create_project] 已保存 optimizer_config")
+
+        # 🆕 兜底 4：自动推断 + 生成 PID 基线，并评估一次
+        # ⚠️ 必须在 _model_code 注入后执行，否则 engine 无法创建模型
+        try:
+            from core.baselines import infer_baseline_type, generate_pid_control_law
+
+            baseline_type = infer_baseline_type(config)
+            if baseline_type == "pid":
+                baseline_code = generate_pid_control_law(config)
+                baseline_params = {"kp": 5.0, "ki": 2.0, "kd": 0.5}
+                baseline_cost = _evaluate_baseline_cost(
+                    config, baseline_code, baseline_params, work_dir
+                )
+                config["baseline"] = {
+                    "type": "pid",
+                    "control_law_code": baseline_code,
+                    "params": baseline_params,
+                    "cost": baseline_cost,
+                }
+                print(f"[create_project] PID 基线评估完成: cost={baseline_cost:.4f}")
+            else:
+                print(f"[create_project] 未推断出基线类型（跳过）")
+        except Exception as e:
+            import traceback
+            print(f"[create_project] PID 基线评估失败: {e}")
+            traceback.print_exc()
 
         project.scene_config = config
         file_storage.save_scene_config(project_id, config)
@@ -410,6 +667,33 @@ async def get_active_run(project_id: str, db: Session = Depends(get_db)):
         "active": run is not None,
         "run_id": run.run_id if run else None,
     }
+
+@router.get("/projects/{project_id}/latest-run")
+async def get_latest_run(project_id: str, db: Session = Depends(get_db)):
+    """获取项目最近一次演化运行的 run_id（不管是否在运行）
+
+    用于在项目详情页展示"查看演化记录"按钮。
+    """
+    from backend.src.models import EvolutionRun
+
+    project = db.query(Project).filter(Project.project_id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="项目不存在")
+
+    run = (
+        db.query(EvolutionRun)
+        .filter(EvolutionRun.project_id == project_id)
+        .order_by(EvolutionRun.created_at.desc())
+        .first()
+    )
+
+    return {
+        "has_run": run is not None,
+        "run_id": run.run_id if run else None,
+        "status": run.status if run else None,
+    }
+
+
 
 @router.get("/projects/{project_id}/versions/{version}")
 async def get_project_version_detail(

@@ -52,6 +52,18 @@ async def get_evolution_status(run_id: str, db: Session = Depends(get_db)):
     status["run_id"] = run_id
     status["project_id"] = run.project_id
     status["version"] = run.version
+
+    # 🆕 附加 baseline cost（用于前端对比展示）
+    from backend.src.models import Project
+    project = db.query(Project).filter(Project.project_id == run.project_id).first()
+    if project and project.scene_config:
+        baseline = project.scene_config.get("baseline")
+        if baseline and isinstance(baseline.get("cost"), (int, float)):
+            status["baseline_cost"] = float(baseline["cost"])
+        else:
+            status["baseline_cost"] = None
+    else:
+        status["baseline_cost"] = None
     return status
 
 

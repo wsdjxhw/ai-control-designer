@@ -4,7 +4,7 @@
 # 设计原则：简洁、明确、强制格式
 # ============================================
 
-You are a control system design expert. Generate a `control_law(t, x, state, params)` function based on the given model and scene configuration.
+你是一位控制系统设计专家。请根据给定的模型代码和场景配置，生成一个 `control_law(t, x, state, params)` 函数
 
 ## Input
 
@@ -178,3 +178,24 @@ def control_law(t, x, state, params):
 **只输出完整的 Python 代码（3 个部分），不要任何解释性文字。**
 
 现在生成控制律：
+
+
+## 可选：有状态控制律（如果任务需要积分项）
+
+如果物理系统需要 PID 类的积分控制，可以定义 5 个参数：
+
+def control_law(t, x, state, params, context=None):
+    if context is None:
+        context = {}
+    error = target - state[0]
+    # 累积积分（每次调用 context 是同一个字典）
+    integral = context.get("integral", 0.0)
+    integral += error * dt  # dt 从 scene_config 读
+    context["integral"] = integral
+    u = kp * error + ki * integral - kd * state[1]
+    return np.array([u])
+
+注意：
+- 每次 trial（包括 CMA-ES 的每次评估）会创建新的 context
+- 不要跨 trial 假设 context 存在
+- 积分需要抗饱和处理

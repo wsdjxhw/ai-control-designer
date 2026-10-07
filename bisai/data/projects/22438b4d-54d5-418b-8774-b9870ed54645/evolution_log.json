@@ -1,0 +1,78 @@
+[
+  {
+    "version": 1,
+    "timestamp": "2026-10-01T21:59:29.639601",
+    "params": {
+      "Kp_omega": 4.281201817276614,
+      "Kd_current": 0.3196839438935639,
+      "ff_gain": 4.241486624644174,
+      "Ki_omega": 0.306348950122258
+    },
+    "cost": 101.3553816538563,
+    "param_count": 4,
+    "diagnosis_summary": "# Diagnosis Report\n\n## 1. Executive Summary\n\n**The critical issue is total control collapse on the `current` state**: `final_dev=0.0000` paired with `integrated_dev=0.0000` means the controller is trivially satisfying the `current` constraint only because it is driving the state to a singular point — while simultaneously the `omega` state shows `final_dev=100.0000` (at upper bound) and `integrated_dev=50000.0000`, indicating the control effort is being dumped into a completely unconstrained degr",
+    "metrics": {
+      "state_stats": {
+        "omega": {
+          "final_mean": 0.0,
+          "final_deviation": 100.0,
+          "max_deviation": 100.0,
+          "integrated": 50000.0
+        },
+        "current": {
+          "final_mean": 0.0,
+          "final_deviation": 0.0,
+          "max_deviation": 0.0,
+          "integrated": 0.0
+        }
+      },
+      "control_stats": {
+        "voltage": {
+          "mean_usage": -12.520445420999216,
+          "max_usage": 0.0,
+          "total_integrated": -62.631975376864695
+        }
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "version": 2,
+    "timestamp": "2026-10-01T22:02:03.753385",
+    "params": {
+      "Kp_omega": 8.08413542329758,
+      "K_cross": 6.87784058608041,
+      "Vmax": 5.025966232339646,
+      "ff_gain": 2.0785484154669662,
+      "Ki_omega": 1.8959749775810721,
+      "Kp_current": 1.6241910643988389
+    },
+    "cost": 327.62828975275283,
+    "param_count": 6,
+    "diagnosis_summary": "# Diagnosis Report\n\n## 1. Executive Summary\n\n**The controller has structurally collapsed `omega` regulation**: `final_dev=95.43`, `max_dev=100.00`, and `integrated_dev=45,567` for `omega` represent near-total loss of speed control — the cost of 101.36 is overwhelmingly dominated by this single state's squared error, with `current` tracking essentially sacrificed (`final_dev=0.4569`) because the controller is parking `omega` near a singular zero.\n\n## 2. Parameter Bound Analysis\n\n| Parameter | Val",
+    "metrics": {
+      "state_stats": {
+        "omega": {
+          "final_mean": 4.56906021121786,
+          "final_deviation": 95.43093978878214,
+          "max_deviation": 100.0,
+          "integrated": 45566.787078613546
+        },
+        "current": {
+          "final_mean": 0.45690602112178563,
+          "final_deviation": 0.45690602112178563,
+          "max_deviation": 1.6944907862088505,
+          "integrated": 1.1097883888366389
+        }
+      },
+      "control_stats": {
+        "voltage": {
+          "mean_usage": 4.992780266253808,
+          "max_usage": 5.025966232339646,
+          "total_integrated": 24.988699302769877
+        }
+      },
+      "anomalies": []
+    }
+  }
+]

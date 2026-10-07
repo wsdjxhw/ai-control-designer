@@ -12,9 +12,9 @@
     "seed": 42
   },
   "max_iterations": 20,
-  "llm_model": "gpt-5",
-  "llm_base_url": "https://api.catcat.top/v1",
-  "llm_api_key": "sk-7Xe4aiPRs9W1ETTxPly1iqEm08kpLaH5isV2DMLMBzuVK55i",
+  "llm_model": "minimax-m3",
+  "llm_base_url": "https://new.maoyu.cfd/v1",
+  "llm_api_key": "sk-ES4VYJNkKy0X7OCmgSbFHc8CdhIMJyEK3tvP2gHMAP9d3uCq",
   "llm_temperature": 0.0,
   "llm_timeout": 250,
   "optimizer_type": "tpe"

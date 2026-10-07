@@ -48,6 +48,7 @@ class EvolutionLogger:
             "diagnosis_summary": (
                 diagnosis[:500] if len(diagnosis) > 500 else diagnosis
             ),
+            "diagnosis": diagnosis,  # 🆕 完整报告
             "metrics": metrics or {},
         }
         self._records.append(record)

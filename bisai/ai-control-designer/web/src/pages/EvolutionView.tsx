@@ -67,7 +67,11 @@ const EvolutionView: React.FC = () => {
     listProjectVersions(pid)
       .then((res) => setProjectVersions(res.versions || []))
       .catch(() => {});
-  }, [(status as any)?.project_id, (status as any)?.current_version, status?.status,]);
+  }, [
+    (status as any)?.project_id,
+    (status as any)?.current_version,
+    status?.status,
+  ]);
 
   const handleStoreToRag = async () => {
     if (!currentVersion || !taskId || storingRag) return;
@@ -111,6 +115,12 @@ const EvolutionView: React.FC = () => {
       setStopping(false);
     }
   };
+
+  // 🆕 从 status 中拿 baseline_cost
+  const baselineCost: number | null = (() => {
+    const bc = (status as any)?.baseline_cost;
+    return typeof bc === 'number' && bc > 0 ? bc : null;
+  })();
 
   // 科技感图表配色
   const costChartOption = {
@@ -173,9 +183,32 @@ const EvolutionView: React.FC = () => {
         }],
       },
       markLine: {
-        data: [{ type: 'average', name: '平均值' }],
-        label: { formatter: (p: any) => `平均: ${p.value.toFixed(2)}`, color: '#64748b' },
-        lineStyle: { color: '#64748b', type: 'dashed' },
+        silent: true,
+        symbol: 'none',
+        data: [
+          {
+            type: 'average',
+            name: '平均值',
+            label: {
+              formatter: (p: any) => `平均 ${p.value.toFixed(2)}`,
+              color: '#64748b',
+              position: 'insideEndTop',
+            },
+            lineStyle: { color: '#64748b', type: 'dashed', width: 1 },
+          },
+          // 基线水平线（如果有）
+          ...(baselineCost !== null ? [{
+            yAxis: baselineCost,
+            name: 'PID 基线',
+            label: {
+              formatter: `PID 基线 ${baselineCost.toFixed(2)}`,
+              color: '#fb923c',
+              position: 'insideEndTop',
+              fontWeight: 'bold' as const,
+            },
+            lineStyle: { color: '#fb923c', type: 'dashed', width: 2 },
+          }] : []),
+        ],
       },
     }],
   };
@@ -198,6 +231,18 @@ const EvolutionView: React.FC = () => {
   const totalIterations = (status as any)?.max_iterations || 3;
   const currentIter = (status as any)?.iteration || 0;
   const currentVersionNum = (status as any)?.current_version || 0;
+
+  // "最新完成版本" = 有代价的最大版本号
+  const completedVersionNum = (() => {
+    const withCost = (projectVersions || []).filter(
+      (v: any) => typeof v.cost === 'number'
+    );
+    if (withCost.length > 0) {
+      return Math.max(...withCost.map((v: any) => v.version));
+    }
+    return 0;
+  })();
+
   const isFinished =
     status?.status === 'completed' ||
     status?.status === 'done' ||
@@ -234,7 +279,6 @@ const EvolutionView: React.FC = () => {
           }`}>
             {isPolling ? '● 实时监控中' : '○ 已停止'}
           </span>
-          {/* 🆕 B-8：中断按钮，只在演化进行中显示 */}
           {isEvolving && (
             <button
               onClick={handleStop}
@@ -286,17 +330,24 @@ const EvolutionView: React.FC = () => {
                 : '⏸️ 待启动'}
             </p>
           </div>
+
           <div className="glass-card p-4">
-            <p className="text-sm text-gray-400 font-mono">当前版本</p>
+            <p className="text-sm text-gray-400 font-mono">最新完成版本</p>
             <p className="text-lg font-semibold mt-1 text-white">
-              v{currentVersionNum}
+              {completedVersionNum > 0 ? `v${completedVersionNum}` : '--'}
             </p>
           </div>
+
           <div className="glass-card p-4 border-purple-500/30">
             <p className="text-sm text-gray-400 font-mono">最佳代价</p>
             <p className="text-lg font-semibold mt-1 text-purple-400">
-              {status.best_cost?.toFixed(4) || '--'}
+              {typeof status.best_cost === 'number' ? status.best_cost.toFixed(4) : '--'}
             </p>
+            {baselineCost !== null && (
+              <p className="text-xs text-orange-400 mt-0.5 font-mono">
+                基线 {baselineCost.toFixed(2)}
+              </p>
+            )}
           </div>
           <div className="glass-card p-4">
             <p className="text-sm text-gray-400 font-mono">演化进度</p>
@@ -345,6 +396,18 @@ const EvolutionView: React.FC = () => {
       {/* 图表 */}
       <div className="glass-card p-4">
         <ReactECharts option={costChartOption} style={{ height: 280 }} />
+        {baselineCost !== null && (
+          <div className="text-xs text-gray-500 mt-2 flex items-center justify-end gap-3">
+            <span className="flex items-center gap-1">
+              <span className="inline-block w-4 h-0.5 bg-blue-500"></span>
+              AI 演化曲线
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="inline-block w-4 h-0.5" style={{ borderTop: '2px dashed #fb923c', height: 0 }}></span>
+              PID 基线 {baselineCost.toFixed(2)}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* 版本详情 */}
@@ -410,7 +473,7 @@ const EvolutionView: React.FC = () => {
                     </span>
                   ))}
                 </div>
-                {currentVersion.anomalies?.length > 0 && (
+                {currentVersion.anomalies && currentVersion.anomalies.length > 0 && (
                   <div className="mt-2 text-red-400 text-xs">
                     ⚠️ {currentVersion.anomalies.join('; ')}
                   </div>
@@ -439,6 +502,36 @@ const EvolutionView: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* 🆕 控制律代码（全宽卡片） */}
+      {currentVersion && currentVersion.code && (
+        <div className="glass-card p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold text-white flex items-center gap-2">
+              <span className="w-1 h-5 bg-gradient-to-b from-blue-500 to-cyan-500 rounded-full"></span>
+              💻 控制律代码
+              <span className="text-xs px-2 py-0.5 bg-blue-500/20 border border-blue-500/40 rounded text-blue-300 font-mono">
+                control_v{currentVersion.version}.py
+              </span>
+            </h3>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(currentVersion.code || '');
+                alert('✅ 代码已复制到剪贴板');
+              }}
+              className="text-xs px-3 py-1 rounded-lg border bg-[#0a0e17] border-[#1a2d4a] text-gray-400 hover:border-teal-500/50 hover:text-teal-300 transition"
+            >
+              📋 复制代码
+            </button>
+          </div>
+          <pre className="bg-[#0a0e17] p-4 rounded-xl text-xs font-mono text-gray-200 overflow-auto max-h-96 border border-[#1a2d4a] whitespace-pre">
+            {currentVersion.code}
+          </pre>
+          <p className="text-xs text-gray-500 mt-2 font-mono">
+            📁 源文件: data/projects/{taskId?.slice(0, 8)}.../control_v{currentVersion.version}.py
+          </p>
+        </div>
+      )}
 
       {/* 策略解析 */}
       {currentVersion && (

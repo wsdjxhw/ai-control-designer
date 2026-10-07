@@ -32,7 +32,9 @@ class RAGRetriever:
             if results and results['ids']:
                 for i in range(len(results['ids'][0])):
                     distance = results['distances'][0][i] if results['distances'] else 1.0
-                    similarity = 1.0 / (1.0 + distance)
+                    # 🆕 用 exp(-distance) 让相似度更平滑地映射到 (0, 1]
+                    import math
+                    similarity = math.exp(-distance / 10.0)
                     formatted.append({
                         "id": results['ids'][0][i],
                         "code": results['documents'][0][i] if results['documents'] else "",

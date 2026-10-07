@@ -8,6 +8,8 @@ import {
   getProjectVersionDetail,
   ProjectVersionDetail,
   getActiveRun,
+  getLatestRun,
+  reevaluateBaseline,
 } from '@/api/client';
 
 const ProjectDetail: React.FC = () => {
@@ -28,6 +30,14 @@ const ProjectDetail: React.FC = () => {
 
   // 🆕 当前正在运行的演化 run_id（用于"进入实时监控"按钮）
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
+
+  // 🆕 最近一次演化 run_id（用于"查看演化记录"按钮）
+  const [latestRunId, setLatestRunId] = useState<string | null>(null);
+
+  // 🆕 基线参数编辑 state
+  const [editingBaseline, setEditingBaseline] = useState(false);
+  const [baselineParams, setBaselineParams] = useState<Record<string, number>>({});
+  const [reevaluating, setReevaluating] = useState(false);
 
   // 🆕 查看版本详情
   const handleViewVersion = async (version: number) => {
@@ -67,6 +77,14 @@ const ProjectDetail: React.FC = () => {
     const timer = setInterval(checkActive, 3000);
     return () => clearInterval(timer);
   }, [id]);
+
+  // 🆕 加载最近一次演化 run_id（不管是否在运行）
+  useEffect(() => {
+    if (!id) return;
+    getLatestRun(id)
+      .then((res) => setLatestRunId(res.has_run ? res.run_id : null))
+      .catch(() => setLatestRunId(null));
+  }, [id, currentProject?.status, currentProject?.current_version]);
 
   const loadVersions = async () => {
     if (!id) return;
@@ -123,6 +141,23 @@ const ProjectDetail: React.FC = () => {
     }
   };
 
+  // 🆕 重新评估基线
+  const handleReevaluateBaseline = async () => {
+    if (!id) return;
+    setReevaluating(true);
+    try {
+      const res = await reevaluateBaseline(id, baselineParams);
+      // 刷新项目数据
+      await fetchProject(id);
+      setEditingBaseline(false);
+      alert(`✅ 基线已重新评估：cost = ${res.baseline.cost.toFixed(2)}`);
+    } catch (err: any) {
+      alert('重新评估失败: ' + err.message);
+    } finally {
+      setReevaluating(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -134,6 +169,7 @@ const ProjectDetail: React.FC = () => {
   if (!currentProject) return <div className="text-center py-10 text-gray-400">项目不存在</div>;
 
   const latestVersion = versions.length > 0 ? Math.max(...versions.map(v => v.version)) : 0;
+  const baseline = currentProject.scene_config?.baseline;
 
   return (
     <div className="space-y-6">
@@ -205,7 +241,7 @@ const ProjectDetail: React.FC = () => {
               {evolving ? '⏳ 启动中...' : `▶️ 从最新版 v${latestVersion || 1} 继续`}
             </button>
 
-            {/* 🆕 进入实时监控按钮 */}
+            {/* 🆕 进入实时监控按钮（仅运行中显示） */}
             {activeRunId && (
               <button
                 onClick={() => navigate(`/evolution/${activeRunId}`)}
@@ -213,6 +249,17 @@ const ProjectDetail: React.FC = () => {
                 title="进入演化监控页，实时查看进度"
               >
                 📊 进入实时监控
+              </button>
+            )}
+
+            {/* 🆕 查看演化记录按钮（非运行中且已有历史 run 时显示） */}
+            {!activeRunId && latestRunId && (
+              <button
+                onClick={() => navigate(`/evolution/${latestRunId}`)}
+                className="px-6 py-2.5 rounded-2xl font-semibold text-blue-400 bg-[#0a0e17] border border-blue-500/50 hover:bg-blue-500/10 hover:border-blue-400 transition-all"
+                title="查看历史演化记录（曲线、诊断、版本详情）"
+              >
+                📊 查看演化记录
               </button>
             )}
 
@@ -291,6 +338,136 @@ const ProjectDetail: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* 🆕 基线对比（AI 设计器 vs PID/经典方法） */}
+      {baseline && typeof baseline.cost === 'number' && (
+        <div className="glass-card p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-white flex items-center gap-2">
+              <span className="w-1 h-5 bg-gradient-to-b from-orange-500 to-red-500 rounded-full"></span>
+              📊 AI 设计器 vs 基线对比
+            </h3>
+            <div className="flex gap-2">
+              {!editingBaseline && (
+                <button
+                  onClick={() => {
+                    setBaselineParams(baseline.params || { kp: 5.0, ki: 2.0, kd: 0.5 });
+                    setEditingBaseline(true);
+                  }}
+                  className="text-xs px-3 py-1.5 bg-orange-600/20 border border-orange-500/50 text-orange-400 rounded-lg hover:bg-orange-600/40 transition"
+                >
+                  ⚙️ 调整参数
+                </button>
+              )}
+              {editingBaseline && (
+                <>
+                  <button
+                    onClick={handleReevaluateBaseline}
+                    disabled={reevaluating}
+                    className="text-xs px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg transition"
+                  >
+                    {reevaluating ? '⏳ 评估中...' : '✓ 重新评估'}
+                  </button>
+                  <button
+                    onClick={() => setEditingBaseline(false)}
+                    disabled={reevaluating}
+                    className="text-xs px-3 py-1.5 bg-[#1a2d4a] hover:bg-[#2a3f5a] text-gray-300 rounded-lg transition"
+                  >
+                    取消
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* 参数编辑区（编辑模式下显示） */}
+          {editingBaseline && (
+            <div className="mb-4 p-4 bg-[#0a0e17] border border-orange-500/30 rounded-xl">
+              <div className="text-xs text-orange-400 mb-3 font-mono">PID 参数调整</div>
+              <div className="grid grid-cols-3 gap-3">
+                {['kp', 'ki', 'kd'].map((key) => (
+                  <div key={key}>
+                    <label className="block text-xs text-gray-500 mb-1 font-mono">{key.toUpperCase()}</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={baselineParams[key] ?? 0}
+                      onChange={(e) => {
+                        const v = parseFloat(e.target.value);
+                        setBaselineParams((prev) => ({ ...prev, [key]: isNaN(v) ? 0 : v }));
+                      }}
+                      className="w-full px-3 py-2 bg-[#111827] border border-[#2a3d5a] rounded text-white text-sm focus:border-orange-500 focus:outline-none font-mono"
+                    />
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-gray-500 mt-3">
+                💡 修改后点"重新评估"，系统会用新参数跑一次仿真，更新基线代价。
+              </p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-3 gap-4">
+            {/* AI 设计器 */}
+            <div className="bg-[#0a0e17] border border-purple-500/30 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-lg">🤖</span>
+                <span className="text-sm text-purple-400 font-mono">AI 设计器</span>
+              </div>
+              <div className="text-2xl font-bold text-purple-300 font-mono">
+                {typeof currentProject.best_cost === 'number'
+                  ? currentProject.best_cost.toFixed(2)
+                  : '--'}
+              </div>
+              <div className="text-xs text-gray-500 mt-1">
+                演化 {currentProject.current_version} 轮
+              </div>
+            </div>
+
+            {/* 基线 */}
+            <div className="bg-[#0a0e17] border border-orange-500/30 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-lg">📐</span>
+                <span className="text-sm text-orange-400 font-mono">
+                  {baseline.type === 'pid' ? 'PID 基线' : '基线'}
+                </span>
+              </div>
+              <div className="text-2xl font-bold text-orange-300 font-mono">
+                {baseline.cost.toFixed(2)}
+              </div>
+              <div className="text-xs text-gray-500 mt-1 font-mono">
+                {baseline.params
+                  ? `kp=${baseline.params.kp ?? '-'} ki=${baseline.params.ki ?? '-'} kd=${baseline.params.kd ?? '-'}`
+                  : '经典方法'}
+              </div>
+            </div>
+
+            {/* 改进 */}
+            <div className="bg-[#0a0e17] border border-green-500/30 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-lg">📈</span>
+                <span className="text-sm text-green-400 font-mono">改进</span>
+              </div>
+              {typeof currentProject.best_cost === 'number' && baseline.cost > 0 ? (
+                <>
+                  <div className="text-2xl font-bold text-green-300 font-mono">
+                    {((1 - currentProject.best_cost / baseline.cost) * 100).toFixed(1)}%
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    {currentProject.best_cost < baseline.cost ? '代价降低' : '代价增加'}
+                  </div>
+                </>
+              ) : (
+                <div className="text-2xl font-bold text-gray-600 font-mono">--</div>
+              )}
+            </div>
+          </div>
+
+          <p className="text-xs text-gray-500 mt-3">
+            💡 基线使用系统自动生成的经典控制律，AI 设计器通过演化优化达到更低的代价。
+          </p>
+        </div>
+      )}
 
       {/* 场景配置 + 统计信息 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

@@ -1,0 +1,95 @@
+{
+  "domain_name": "dc_motor",
+  "state_names": [
+    "omega",
+    "current"
+  ],
+  "control_names": [
+    "voltage"
+  ],
+  "temporal": {
+    "T": 5,
+    "dt": 0.01,
+    "n_steps": 500
+  },
+  "initial_state": {
+    "omega": 0,
+    "current": 0
+  },
+  "physical_params": {
+    "R": 1,
+    "L": 0.05,
+    "Kt": 1,
+    "Ke": 1,
+    "J": 0.01,
+    "B": 0.1,
+    "T_load": 0
+  },
+  "target_values": {
+    "omega": 100,
+    "current": 0
+  },
+  "control_limits": {
+    "voltage": [
+      -24,
+      24
+    ]
+  },
+  "control_type": "continuous",
+  "cost_weights": {
+    "omega": 1,
+    "current": 1,
+    "voltage": 0.1
+  },
+  "detected_type": "ode",
+  "solver": {
+    "solver_type": "ode_scipy",
+    "solver_params": {}
+  },
+  "model_type": "ode",
+  "cost_function": {
+    "cost_type": "template",
+    "running_cost": {
+      "state_terms": {
+        "omega": {
+          "weight": 1.0,
+          "target": 100
+        },
+        "current": {
+          "weight": 1.0,
+          "target": 0
+        }
+      },
+      "control_terms": {
+        "voltage": {
+          "weight": 0.1
+        }
+      }
+    },
+    "terminal_cost": {
+      "state_terms": {
+        "omega": {
+          "weight": 10.0,
+          "target": 100
+        },
+        "current": {
+          "weight": 10.0,
+          "target": 0
+        }
+      }
+    }
+  },
+  "_model_code": "\"\"\"直流电机模型。\n\n2 维状态 (omega, current)，1 维连续控制 (voltage)。\n状态为 (state_dim,) 的一维 ODE 系统。\n\n状态分量:\n  0: omega   - 转速 (rad/s)\n  1: current - 电枢电流 (A)\n\n控制分量:\n  0: voltage - 电枢电压 (V)，连续 [-Vmax, Vmax]\n\"\"\"\n\nfrom __future__ import annotations\n\nimport numpy as np\n\nfrom core.base.base_model import BaseModel\n\n\nclass DCMotorModel(BaseModel):\n    \"\"\"直流电机 ODE 模型。\"\"\"\n\n    def __init__(self, scene_config: dict) -> None:\n        super().__init__()\n        self._scene_config = scene_config\n\n        temporal = scene_config.get(\"temporal\", {})\n        self.T: float = temporal.get(\"T\", 5.0)\n        self.dt: float = temporal.get(\"dt\", 0.01)\n        self.N: int = int(round(self.T / self.dt))\n\n        phys = scene_config.get(\"physical_params\", {})\n        self.R: float = phys.get(\"R\", 1.0)          # 电枢电阻\n        self.L: float = phys.get(\"L\", 0.05)         # 电枢电感\n        self.Kt: float = phys.get(\"Kt\", 1.0)        # 转矩常数\n        self.Ke: float = phys.get(\"Ke\", 1.0)        # 反电动势常数\n        self.J: float = phys.get(\"J\", 0.01)         # 转动惯量\n        self.B: float = phys.get(\"B\", 0.1)          # 粘滞摩擦\n        self.T_load: float = phys.get(\"T_load\", 0.0)  # 负载转矩\n\n        state_names = scene_config.get(\"state_names\", [])\n        self._state_dim: int = len(state_names) if state_names else 2\n        self._control_dim: int = len(scene_config.get(\"control_names\", [])) or 1\n\n        # ODE 模型无空间网格，提供单点以兼容控制律接口\n        self.x_grid: np.ndarray = np.array([0.0])\n        self.dx: float = 1.0\n\n    # ---- BaseModel 接口实现 ----\n\n    @property\n    def state_dim(self) -> int:\n        return self._state_dim\n\n    @property\n    def control_dim(self) -> int:\n        return self._control_dim\n\n    def get_initial_state(self) -> np.ndarray:\n        \"\"\"初始状态：静止（omega=0, current=0）。\"\"\"\n        init = self._scene_config.get(\"initial_state\", {})\n        return np.array([\n            init.get(\"omega0\", 0.0),\n            init.get(\"current0\", 0.0),\n        ], dtype=float)\n\n    def rhs(self, t: float, state: np.ndarray, control: np.ndarray) -> np.ndarray:\n        \"\"\"计算直流电机方程右端项。\n\n        Args:\n            t: 当前时间.\n            state: shape (2,).\n            control: shape (1,) 或 (control_dim,).\n\n        Returns:\n            shape (2,).\n        \"\"\"\n        omega, current = state\n        voltage = float(np.asarray(control, dtype=float).reshape(-1)[0])\n\n        d_omega = (self.Kt * current - self.B * omega - self.T_load) / self.J\n        d_current = (voltage - self.R * current - self.Ke * omega) / self.L\n        return np.array([d_omega, d_current])\n\n    def validate_state(self, state: np.ndarray) -> bool:\n        if np.isnan(state).any():\n            return False\n        if np.any(state > 1e6) or np.any(state < -1e6):\n            return False\n        return True\n\n    @property\n    def scene_config(self) -> dict:\n        return self._scene_config\n\n    def __repr__(self) -> str:\n        return f\"DCMotorModel(N={self.N}, dt={self.dt}, J={self.J}, R={self.R})\"\n",
+  "optimizer": {
+    "optimizer_type": "cmaes",
+    "popsize": 50,
+    "sigma0": 0.25,
+    "n_particles": 30,
+    "w": 0.7,
+    "c1": 1.5,
+    "c2": 1.5,
+    "max_iter": 100,
+    "n_startup_trials": 10,
+    "n_ei_candidates": 24
+  }
+}

@@ -109,9 +109,30 @@ def control_law(t, x, state, params):
 - Return ONLY the code, no explanations
 """
 
+    
+    last_error = None
+
     for attempt in range(3):
+        # 🆕 如果上一次失败，把错误信息追加到 prompt
+        full_prompt = prompt
+        if last_error:
+            full_prompt = prompt + f"""
+
+## ⚠️ 上一次生成的代码有错误：
+
+{last_error}
+
+请仔细检查并修复这个问题，重新生成完整代码。
+特别注意：
+- 所有 `params.get("xxx")` 用的参数名，必须在 `# @param:` 里声明
+- 所有变量必须在使用前赋值
+- 不要在一行里写多条语句（每个赋值语句必须独立一行）
+- 缩进必须正确
+
+现在重新生成：
+"""
         try:
-            content = llm.invoke(prompt)
+            content = llm.invoke(full_prompt)   # ← 注意：这里改用 full_prompt
 
             # 提取代码块
             code_match = re.search(r'```(?:python)?\s*(.*?)\s*```', content, re.DOTALL)
@@ -125,13 +146,34 @@ def control_law(t, x, state, params):
                 else:
                     code = content.strip()
 
+
             # 验证代码包含必要元素
-            if "def control_law" in code and "return" in code:
-                return code
-            else:
-                print(f"[expert] 生成尝试 {attempt + 1}: 代码缺少 control_law 函数或 return 语句")
+            if "def control_law" not in code or "return" not in code:
+                last_error = "代码缺少 control_law 函数或 return 语句"
+                print(f"[expert] 生成尝试 {attempt + 1}: {last_error}")
+                continue  # ← 关键：不要落到 sleep 外面，直接重试
+
+            # 🆕 第一级验证：语法检查
+            from core.llm.utils import validate_syntax, smoke_test_control_law
+            ok, err = validate_syntax(code)
+            if not ok:
+                last_error = f"语法错误: {err}"
+                print(f"[expert] 生成尝试 {attempt + 1}: {last_error}")
+                continue
+
+            # 🆕 第二级验证：烟雾测试（真的执行一次）
+            ok, err = smoke_test_control_law(code, scene_config)
+            if not ok:
+                last_error = f"烟雾测试失败: {err}"
+                print(f"[expert] 生成尝试 {attempt + 1}: {last_error}")
+                continue
+
+            # 两级都通过
+            print(f"[expert] 生成成功（尝试 {attempt + 1}）")
+            return code
 
         except Exception as e:
+            last_error = f"LLM 调用异常: {type(e).__name__}: {e}"
             print(f"[expert] 生成尝试 {attempt + 1} 失败: {e}")
 
         import time
@@ -432,6 +474,31 @@ def parse_single_model_file(
 **1. 代码结构分析**:
 - 找到 `class XXXModel(BaseModel)` 定义
 - 找到 `__init__` 方法中的所有 `self.xxx = yyy` 赋值
+
+**1.5 状态变量和控制变量（最重要，必须准确）**:
+
+**state_names 提取规则（按优先级）**:
+1. 如果 rhs 方法里有解包语句（如 `theta, omega = x[0], x[1]`、`S, I, R = state`、
+   `theta, omega, dtheta = state`），**直接用这些变量名**
+2. 如果 get_initial_state 的返回语句里有注释（如 `# [θ, ω]` 或 `# [position, velocity]`），
+   用注释里的英文名（θ→theta, ω→omega）
+3. 如果代码里完全找不到语义名，用 `x1, x2, ...` 作为默认名
+4. **数量必须严格等于 state 数组的长度**
+
+**control_names 提取规则（按优先级）**:
+1. 如果 rhs 方法里有 `torque = u[0]`、`force = u[0]`、`voltage = u[0]` 这种解包，
+   **直接用这些变量名**
+2. 从 __init__ 里的 `self.force_limit`、`self.torque_max` 等参数名推断
+   （force_limit → force, torque_max → torque）
+3. 如果只有 `u[0]`、`u[1]` 下标访问，用 `u1, u2, ...` 作为默认名
+4. **数量必须严格等于 control 数组的长度**
+
+**反例（不要这样做）**:
+- ❌ 看到 `x[0], x[1]` 就随便起名 `state1, state2`
+- ❌ 看到 `u[0]` 就起名 `control1` 或 `input1`
+- ❌ 忽略代码里的解包语句，直接用下标号
+
+
 
 **2. 参数分类提取**:
 - **物理参数** → `physical_params`: mass, damping, spring_constant, beta, gamma, R, L, J 等

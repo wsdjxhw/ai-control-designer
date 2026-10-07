@@ -1,0 +1,100 @@
+{
+  "domain_name": "Pendulum",
+  "state_names": [
+    "theta",
+    "omega"
+  ],
+  "control_names": [
+    "torque"
+  ],
+  "temporal": {
+    "T": 5,
+    "dt": 0.01,
+    "n_steps": 500
+  },
+  "initial_state": {
+    "theta": 0.5,
+    "omega": 0
+  },
+  "physical_params": {
+    "length": 1,
+    "mass": 1,
+    "g": 9.81
+  },
+  "target_values": {
+    "theta": 10,
+    "omega": 5
+  },
+  "control_limits": {
+    "torque": [
+      -10
+    ]
+  },
+  "control_type": "continuous",
+  "cost_weights": {
+    "theta": 1,
+    "omega": 1,
+    "torque": 0.1
+  },
+  "detected_type": "ode",
+  "solver": {
+    "solver_type": "ode_scipy",
+    "solver_params": {}
+  },
+  "model_type": "ode",
+  "cost_function": {
+    "cost_type": "template",
+    "running_cost": {
+      "state_terms": {
+        "theta": {
+          "weight": 1.0,
+          "target": "theta"
+        },
+        "omega": {
+          "weight": 1.0,
+          "target": "omega"
+        }
+      },
+      "control_terms": {
+        "torque": {
+          "weight": 0.1
+        }
+      }
+    },
+    "terminal_cost": {
+      "state_terms": {
+        "theta": {
+          "weight": 10.0,
+          "target": "theta"
+        },
+        "omega": {
+          "weight": 10.0,
+          "target": "omega"
+        }
+      }
+    }
+  },
+  "_model_code": "# 示例：单摆系统 (Pendulum)\n# 继承 BaseModel 并实现必需的方法\n# 硬编码参数 (self.xxx = ...) 会被 LLM 自动提取\n\nfrom core.base.base_model import BaseModel\nimport numpy as np\n\nclass Pendulum(BaseModel):\n    \"\"\"单摆系统\"\"\"\n\n    def __init__(self, scene_config=None):\n        if scene_config is None:\n            scene_config = {}\n        params = scene_config.get(\"model_params\", {})\n        self.length = params.get(\"length\", 1.0)      # 摆长 (m)\n        self.mass = params.get(\"mass\", 1.0)          # 摆锤质量 (kg)\n        self.g = params.get(\"g\", 9.81)               # 重力加速度 (m/s²)\n\n    def get_initial_state(self, x_grid=None):\n        \"\"\"返回初始状态 [θ, ω]\"\"\"\n        # 默认初始状态: θ=0.5 rad, ω=0\n        return np.array([0.5, 0.0])\n\n    def rhs(self, t, x, u):\n        \"\"\"状态方程: dx/dt = f(x, u)\"\"\"\n        theta, omega = x[0], x[1]\n        torque = u[0] if len(u) > 0 else 0.0\n\n        # 单摆动力学\n        dtheta_dt = omega\n        domega_dt = -(self.g / self.length) * np.sin(theta) + torque / (self.mass * self.length**2)\n\n        return np.array([dtheta_dt, domega_dt])\n\n    def validate_state(self, state):\n        \"\"\"验证状态是否有效\"\"\"\n        # 单摆状态通常没有硬性约束,返回 True 表示总是有效\n        return True\n",
+  "optimizer": {
+    "optimizer_type": "cmaes",
+    "popsize": 50,
+    "sigma0": 0.25,
+    "n_particles": 30,
+    "w": 0.7,
+    "c1": 1.5,
+    "c2": 1.5,
+    "max_iter": 100,
+    "n_startup_trials": 10,
+    "n_ei_candidates": 24
+  },
+  "baseline": {
+    "type": "pid",
+    "control_law_code": "import numpy as np\n\n# ========== PARAM DECLARATION ==========\n# @param: kp (0.0, 100.0)\n# @param: ki (0.0, 50.0)\n# @param: kd (0.0, 50.0)\n# ========== END PARAM DECLARATION ==========\n\ndef control_law(t, x, state, params, context=None):\n    \"\"\"\n    PID 基线控制律（自动生成，有状态版本）。\n    通过 context 字典累积积分项。\n    \"\"\"\n    if context is None:\n        context = {}\n\n    theta = state[0]\n    omega = state[1]\n\n    error = 10.0 - theta\n\n    kp = params.get(\"kp\", 5.0)\n    ki = params.get(\"ki\", 2.0)\n    kd = params.get(\"kd\", 0.5)\n\n    # 🆕 积分项（通过 context 累积）\n    integral = context.get(\"integral\", 0.0)\n    integral += error * 0.01\n    # 抗积分饱和\n    integral = float(np.clip(integral, -100.0, 100.0))\n    context[\"integral\"] = integral\n\n    u = kp * error + ki * integral - kd * omega\n    u = np.clip(u, -1000000.0, 1000000.0)\n\n    return np.array([u])\n",
+    "params": {
+      "kp": 5.0,
+      "ki": 2.0,
+      "kd": 0.5
+    },
+    "cost": 3755.129440833847
+  }
+}

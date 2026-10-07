@@ -3,16 +3,27 @@ import MonacoEditor from '@monaco-editor/react';
 
 export interface OptimizerConfig {
   optimizer_type: 'cmaes' | 'pso' | 'tpe' | 'random' | 'grid' | 'custom';
-  popsize?: number;              // CMA-ES: 种群大小
-  sigma0?: number;               // CMA-ES: 初始步长
-  n_particles?: number;          // PSO: 粒子数量
-  w?: number;                    // PSO: 惯性权重
-  c1?: number;                   // PSO: 个体学习因子
-  c2?: number;                   // PSO: 社会学习因子
-  max_iter?: number;             // PSO: 最大迭代次数
-  n_startup_trials?: number;     // TPE: 随机采样次数
-  n_ei_candidates?: number;      // TPE: EI候选数
-  custom_optimizer_code?: string; // Custom: 用户自定义优化器代码
+
+  // 🆕 通用参数（所有优化器共享）
+  n_trials?: number;             // 优化次数（每个优化器都读这个字段）
+
+  // CMA-ES
+  popsize?: number;
+  sigma0?: number;
+
+  // PSO
+  n_particles?: number;
+  w?: number;
+  c1?: number;
+  c2?: number;
+  max_iter?: number;
+
+  // TPE
+  n_startup_trials?: number;
+  n_ei_candidates?: number;
+
+  // Custom
+  custom_optimizer_code?: string;
 }
 
 interface OptimizerConfigPanelProps {
@@ -31,6 +42,9 @@ const OPTIMIZER_OPTIONS = [
 
 const OptimizerConfigPanel: React.FC<OptimizerConfigPanelProps> = ({ config, onChange }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+
+  // 🆕 优化次数输入的临时草稿（避免打字时被 clamp 强制修正）
+  const [nTrialsDraft, setNTrialsDraft] = useState<string>('');
 
   const updateConfig = (updates: Partial<OptimizerConfig>) => {
     onChange({ ...config, ...updates });
@@ -277,9 +291,6 @@ class CustomOptimizer(BaseOptimizer):
 
         Returns:
             (best_params, best_value, history)
-            - best_params: 最优参数字典
-            - best_value: 最优代价值
-            - history: 每轮优化历史 [{"params": {...}, "value": float}, ...]
         """
         import random
         random.seed(seed)
@@ -377,6 +388,64 @@ class CustomOptimizer(BaseOptimizer):
                   <div className="text-xs text-gray-400">{opt.desc}</div>
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* 🆕 通用参数：优化次数（所有优化器共享）*/}
+          <div className="pt-4 border-t border-[#1a2d4a]">
+            <div className="text-sm font-semibold text-orange-400 mb-3">通用参数（所有优化器共享）</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  优化次数 <span className="text-xs text-gray-500">(n_trials)</span>
+                </label>
+                <input
+                  type="number"
+                  min={20}
+                  max={5000}
+                  step={50}
+                  value={nTrialsDraft !== '' ? nTrialsDraft : String(config.n_trials ?? 500)}
+                  onChange={(e) => {
+                    // 🆕 打字时只更新草稿，不 clamp
+                    setNTrialsDraft(e.target.value);
+                  }}
+                  onBlur={() => {
+                    // 🆕 失焦时才解析 + clamp
+                    const raw = nTrialsDraft;
+                    if (raw === '') {
+                      // 空值，恢复显示 state 值
+                      setNTrialsDraft('');
+                      return;
+                    }
+                    const v = parseInt(raw);
+                    const clamped = isNaN(v) ? 500 : Math.max(20, Math.min(5000, v));
+                    updateConfig({ n_trials: clamped });
+                    setNTrialsDraft(''); // 清空草稿，让 input 显示 state 值
+                  }}
+                  onKeyDown={(e) => {
+                    // 🆕 回车触发失焦，等同保存
+                    if (e.key === 'Enter') {
+                      (e.target as HTMLInputElement).blur();
+                    }
+                  }}
+                  className="w-full px-4 py-2.5 bg-[#0a0f1a] border border-[#1a2d4a] rounded-xl text-white focus:border-orange-500 focus:outline-none"
+                />
+                <p className="mt-1.5 text-xs text-gray-500">
+                  每个参数组合的评估次数。越大搜索越充分但耗时越长 (默认: 500，演示建议 100-300)
+                </p>
+              </div>
+
+              <div className="flex items-end">
+                <div className="w-full p-3 bg-[#0a0f1a] border border-[#1a2d4a] rounded-xl text-xs text-gray-400">
+                  <div className="font-mono mb-1">
+                    <span className="text-gray-500">预计耗时 ≈ </span>
+                    <span className="text-orange-400 font-bold">
+                      {Math.round((config.n_trials ?? 500) * 0.1)}s
+                    </span>
+                  </div>
+                  <div className="text-gray-500">基于每轮约 0.1s / trial 估算</div>
+                </div>
+              </div>
             </div>
           </div>
 

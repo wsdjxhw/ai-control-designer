@@ -10,10 +10,12 @@ from core.rag.client import RAGClient
 class RAGIndexer:
     def __init__(self, client: RAGClient = None):
         self.client = client or RAGClient()
-    
+
     def add_strategy(self, strategy_id: str, code: str, metadata: Dict[str, Any]) -> bool:
         """
         将控制律策略入库（存在则更新，不存在则新增）
+
+        🆕 使用 upsert 原子操作，避免"先查再写"的 race condition
         """
         try:
             # 将 metadata 中的 dict 值转为 JSON 字符串，因为 ChromaDB 不支持 dict
@@ -24,19 +26,12 @@ class RAGIndexer:
                 else:
                     processed_metadata[k] = v
 
-            existing = self.client.collection.get(ids=[strategy_id])
-            if existing and existing['ids']:
-                self.client.collection.update(
-                    ids=[strategy_id],
-                    documents=[code],
-                    metadatas=[processed_metadata]
-                )
-            else:
-                self.client.collection.add(
-                    ids=[strategy_id],
-                    documents=[code],
-                    metadatas=[processed_metadata]
-                )
+            # 🆕 upsert：原子操作，存在则更新，不存在则新增
+            self.client.collection.upsert(
+                ids=[strategy_id],
+                documents=[code],
+                metadatas=[processed_metadata]
+            )
             return True
         except Exception as e:
             print(f"策略入库失败: {e}")

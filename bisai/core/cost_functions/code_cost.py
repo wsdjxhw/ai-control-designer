@@ -59,7 +59,8 @@ class CodeCost(BaseCost):
 
         # 时间步长
         temporal = scene_config.get("temporal", {})
-        self._dt: float = temporal.get("dt", 1.0)
+        dt_val = temporal.get("dt")
+        self._dt: float = float(dt_val) if dt_val is not None else 1.0
 
     def compute_running(
         self,

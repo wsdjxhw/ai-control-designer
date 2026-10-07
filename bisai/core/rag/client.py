@@ -90,3 +90,19 @@ class RAGClient:
             )
         else:
             self.collection = self.client.create_collection(name=name)
+
+
+
+
+# ========== 全局单例 ==========
+_global_client: RAGClient | None = None
+
+
+def get_rag_client() -> RAGClient:
+    """获取全局单例 RAG 客户端（首次调用时创建）"""
+    global _global_client
+    if _global_client is None:
+        _global_client = RAGClient()
+    return _global_client
+
+

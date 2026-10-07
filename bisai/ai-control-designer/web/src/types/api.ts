@@ -11,6 +11,7 @@ export interface SceneConfig {
   target_values: Record<string, number>;
   cost_weights: Record<string, number>;
   solver_type: 'rk4' | 'scipy_ode' | 'euler';
+  enforce_nonnegative?: boolean;  // 🆕 是否强制状态非负
   [key: string]: any;
 }
 
@@ -49,10 +50,9 @@ export interface EvolutionVersion {
 export interface TaskStatus {
   run_id: string;
   project_id: string;
-  /** 后端状态机：idle / running / optimizing / diagnosing / modifying / done / error */
+  /** 后端状态机：idle / running / optimizing / diagnosing / modifying / completed / failed */
   status: 'idle' | 'running' | 'optimizing' | 'diagnosing'
-        | 'modifying' | 'done' | 'error'
-        | 'completed' | 'failed';
+        | 'modifying' | 'completed' | 'failed';
   current_version: number;
   best_cost: number | null;
   message?: string;

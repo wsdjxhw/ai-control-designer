@@ -20,6 +20,7 @@ export interface SceneConfig {
   cost_weights?: Record<string, number>;
   control_limits?: Record<string, [number, number]>;
   control_type?: 'continuous' | 'bang_bang';
+  enforce_nonnegative?: boolean;  // 🆕 是否强制状态非负
   [key: string]: any;
 }
 
@@ -54,6 +55,9 @@ const SceneConfigPanel: React.FC<SceneConfigPanelProps> = ({ config, onChange, t
   const [modelType, setModelType] = React.useState<'ode' | 'pde'>(
     parsedConfig.model_type || typeDetection?.model_type || 'ode'
   );
+
+  // 🆕 控制范围输入的临时草稿（避免打字时被立即解析覆盖，导致 - 和 , 无法输入）
+  const [limitDrafts, setLimitDrafts] = React.useState<Record<string, string>>({});
 
   // 当 LLM 检测结果变化时，同步更新（仅当用户未手动设置时）
   React.useEffect(() => {
@@ -216,6 +220,44 @@ const SceneConfigPanel: React.FC<SceneConfigPanelProps> = ({ config, onChange, t
         </p>
       </div>
 
+      {/* 🆕 状态非负约束开关 */}
+      <div className="p-4 bg-[#0a0e17] border border-[#1a2d4a] rounded-lg">
+        <div className="flex items-center justify-between">
+          <div>
+            <label className="text-sm font-medium text-gray-300 flex items-center gap-2">
+              🔒 强制状态非负
+            </label>
+            <p className="text-xs text-gray-500 mt-1">
+              仅适用于种群/浓度类模型（如 SIR）。Pendulum/DCMotor 等允许负值状态，应关闭此项。
+            </p>
+          </div>
+          <button
+            onClick={() => updateConfig({ enforce_nonnegative: !parsedConfig.enforce_nonnegative })}
+            className={`relative inline-flex items-center h-6 rounded-full w-11 transition-colors ${
+              parsedConfig.enforce_nonnegative ? 'bg-green-600' : 'bg-gray-600'
+            }`}
+            title={parsedConfig.enforce_nonnegative ? '已开启' : '已关闭'}
+          >
+            <span
+              className={`inline-block w-4 h-4 transform bg-white rounded-full transition-transform ${
+                parsedConfig.enforce_nonnegative ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
+        </div>
+
+        {/* 状态提示 */}
+        <div className="mt-3 flex items-center gap-2">
+          <span className={`text-xs px-2 py-0.5 rounded font-mono ${
+            parsedConfig.enforce_nonnegative
+              ? 'bg-green-500/20 border border-green-500/40 text-green-400'
+              : 'bg-orange-500/20 border border-orange-500/40 text-orange-400'
+          }`}>
+            {parsedConfig.enforce_nonnegative ? '✓ 已开启（状态被截断到 ≥ 0）' : '✗ 已关闭（允许负值）'}
+          </span>
+        </div>
+      </div>
+
       {/* State Variables */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
@@ -284,6 +326,101 @@ const SceneConfigPanel: React.FC<SceneConfigPanelProps> = ({ config, onChange, t
         </div>
       </div>
 
+      {/* 🆕 控制范围（根据控制类型显示不同语义）*/}
+      {parsedConfig.control_names && parsedConfig.control_names.length > 0 && (
+        <div className="space-y-3 pt-3 border-t border-[#1a2d4a]">
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-medium text-gray-300">
+              {parsedConfig.control_type === 'bang_bang'
+                ? '🎚️ 离散值集合'
+                : '📏 控制范围'}
+            </label>
+            <span className="text-xs text-gray-500">
+              {parsedConfig.control_type === 'bang_bang'
+                ? '每个控制的允许值，逗号分隔'
+                : '每个控制的 [下界, 上界]'}
+            </span>
+          </div>
+
+          <div className="space-y-2">
+            {parsedConfig.control_names.map((name, index) => {
+              const limits = parsedConfig.control_limits || {};
+              const currentValues: number[] = Array.isArray(limits[name])
+                ? limits[name]
+                : [];
+
+              // 🆕 优先用草稿；没有草稿则显示现有值
+              const displayValue =
+                limitDrafts[name] !== undefined
+                  ? limitDrafts[name]
+                  : currentValues.join(', ');
+
+              return (
+                <div key={index} className="flex items-center gap-3">
+                  <span className="text-sm text-orange-400 font-mono min-w-[80px]">
+                    {name || `u${index + 1}`}:
+                  </span>
+                  <input
+                    type="text"
+                    value={displayValue}
+                    onChange={(e) => {
+                      // 🆕 打字时只更新草稿，不解析
+                      setLimitDrafts((prev) => ({
+                        ...prev,
+                        [name]: e.target.value,
+                      }));
+                    }}
+                    onBlur={() => {
+                      // 🆕 失焦时才解析并保存
+                      const raw = limitDrafts[name] ?? displayValue;
+                      const nums = raw
+                        .split(',')
+                        .map((s) => s.trim())
+                        .filter((s) => s.length > 0)
+                        .map((s) => parseFloat(s))
+                        .filter((n) => !isNaN(n));
+
+                      const newLimits = { ...(parsedConfig.control_limits || {}) };
+                      if (nums.length > 0) {
+                        newLimits[name] = nums;
+                      } else {
+                        delete newLimits[name];
+                      }
+                      updateConfig({ control_limits: newLimits });
+
+                      // 清掉这个字段的草稿
+                      setLimitDrafts((prev) => {
+                        const next = { ...prev };
+                        delete next[name];
+                        return next;
+                      });
+                    }}
+                    onKeyDown={(e) => {
+                      // 🆕 回车时也触发保存（等同失焦）
+                      if (e.key === 'Enter') {
+                        (e.target as HTMLInputElement).blur();
+                      }
+                    }}
+                    placeholder={
+                      parsedConfig.control_type === 'bang_bang'
+                        ? '例如: 0, 1'
+                        : '例如: -10, 10'
+                    }
+                    className="flex-1 bg-[#0a0e17] border border-[#1a2d4a] rounded px-3 py-1.5 text-sm text-gray-200 font-mono focus:border-blue-500 focus:outline-none"
+                  />
+                </div>
+              );
+            })}
+          </div>
+
+          <p className="text-xs text-gray-500">
+            {parsedConfig.control_type === 'bang_bang'
+              ? '💡 u1 只允许 {0, 1} 就填 "0, 1"；允许 {0, 0.5} 就填 "0, 0.5"'
+              : '💡 填两个数字（下界, 上界），引擎会把控制值 clip 到该范围'}
+          </p>
+        </div>
+      )}
+
       {/* 🆕 空间参数 (Spatial) — 仅 PDE 时显示 */}
       {modelType === 'pde' && (
         <div className="space-y-3 pt-3 border-t border-[#1a2d4a]">
@@ -350,7 +487,13 @@ const SceneConfigPanel: React.FC<SceneConfigPanelProps> = ({ config, onChange, t
               type="number"
               step="0.1"
               value={parsedConfig.temporal?.T ?? 10.0}
-              onChange={(e) => updateTemporal('T', parseFloat(e.target.value))}
+              onChange={(e) => {
+                // 🆕 忽略 NaN 和 ≤0 的输入，避免写入 null
+                const v = parseFloat(e.target.value);
+                if (!isNaN(v) && v > 0) {
+                  updateTemporal('T', v);
+                }
+              }}
               className="w-full px-3 py-2 bg-[#0a0e17] border border-[#1a2d4a] rounded text-white text-sm focus:border-blue-500 focus:outline-none"
             />
           </div>
@@ -360,7 +503,13 @@ const SceneConfigPanel: React.FC<SceneConfigPanelProps> = ({ config, onChange, t
               type="number"
               step="0.001"
               value={parsedConfig.temporal?.dt ?? 0.01}
-              onChange={(e) => updateTemporal('dt', parseFloat(e.target.value))}
+              onChange={(e) => {
+                // 🆕 忽略 NaN 和 ≤0 的输入，避免写入 null
+                const v = parseFloat(e.target.value);
+                if (!isNaN(v) && v > 0) {
+                  updateTemporal('dt', v);
+                }
+              }}
               className="w-full px-3 py-2 bg-[#0a0e17] border border-[#1a2d4a] rounded text-white text-sm focus:border-blue-500 focus:outline-none"
             />
           </div>
@@ -651,6 +800,57 @@ const SceneConfigPanel: React.FC<SceneConfigPanelProps> = ({ config, onChange, t
           </div>
         )}
       </div>
+
+      {/* 🆕 基线对比（自动推断） */}
+      {parsedConfig.baseline && parsedConfig.baseline.type && (
+        <div className="space-y-3 pt-3 border-t border-[#1a2d4a]">
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-medium text-gray-300">
+              📊 基线对比
+            </label>
+            <span className="text-xs text-gray-500">
+              系统自动推断的经典方法
+            </span>
+          </div>
+
+          <div className="p-4 bg-[#0a0e17] border border-orange-500/30 rounded-lg">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-base font-semibold text-orange-400">
+                  {parsedConfig.baseline.type === 'pid' ? '📐 PID 控制器' :
+                   parsedConfig.baseline.type === 'threshold' ? '🚦 阈值 Bang-Bang' :
+                   parsedConfig.baseline.type === 'uniform' ? '🎚️ 均匀控制' :
+                   parsedConfig.baseline.type}
+                </span>
+                <span className="text-xs px-2 py-0.5 bg-orange-500/20 border border-orange-500/40 rounded text-orange-300">
+                  自动推断
+                </span>
+              </div>
+              <span className="text-lg font-bold text-orange-400 font-mono">
+                cost {typeof parsedConfig.baseline.cost === 'number'
+                  ? parsedConfig.baseline.cost.toFixed(2)
+                  : '--'}
+              </span>
+            </div>
+
+            {parsedConfig.baseline.params && Object.keys(parsedConfig.baseline.params).length > 0 && (
+              <div className="grid grid-cols-3 gap-2 text-sm">
+                {Object.entries(parsedConfig.baseline.params).map(([k, v]) => (
+                  <div key={k} className="flex items-center gap-1">
+                    <span className="text-gray-500 font-mono">{k}:</span>
+                    <span className="text-gray-300 font-mono">{String(v)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <p className="text-xs text-gray-500 mt-3">
+              💡 这是系统根据你的场景自动生成的经典控制器，作为对比基准。
+              演化完成后，AI 设计器的代价会与此对比。
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

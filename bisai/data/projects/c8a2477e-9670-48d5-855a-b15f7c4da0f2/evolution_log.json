@@ -1,0 +1,78 @@
+[
+  {
+    "version": 1,
+    "timestamp": "2026-10-01T15:19:08.253905",
+    "params": {
+      "kp_theta": 0.7095251875268296,
+      "kd_theta": 1.6480764633805878,
+      "kp_omega": 1.1149251687552622
+    },
+    "cost": 10.751401402632549,
+    "param_count": 3,
+    "diagnosis_summary": "Looking at the data provided, I notice this is asking me to generate a diagnostic report template, but I'm only seeing metrics for a single \"current version\" without the evolution history context. Let me work with what's available.# Optimization Diagnostic Report — Current Round\n\n---\n\n## 1. Executive Summary\n\n**Single most critical issue**: The state `theta` exhibits a massive terminal deviation (`final_dev = 0.6181`, ~62% from equilibrium) with an integrated deviation of `1.5950`, while the con",
+    "metrics": {
+      "state_stats": {
+        "theta": {
+          "final_mean": 0.3818700065395863,
+          "final_deviation": 0.6181299934604136,
+          "max_deviation": 0.6181299934604136,
+          "integrated": 1.594990628570141
+        },
+        "omega": {
+          "final_mean": 0.0,
+          "final_deviation": 0.5,
+          "max_deviation": 0.5,
+          "integrated": 1.25
+        }
+      },
+      "control_stats": {
+        "torque": {
+          "mean_usage": 1.7811639032478979,
+          "max_usage": 1.8198186904915452,
+          "total_integrated": 8.90588197330122
+        }
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "version": 2,
+    "timestamp": "2026-10-01T15:21:05.264777",
+    "params": {
+      "kd_theta": 8.279811336657756,
+      "int_leak": 0.679057217346855,
+      "kp_theta": 21.962938703206785,
+      "kp_omega": 0.16021446876553064,
+      "ki_theta": 9.556970259279446,
+      "u_ff_bias": 0.5610436649384659,
+      "_theta_integrator": -0.009782532297329099
+    },
+    "cost": 13.693519299852836,
+    "param_count": 6,
+    "diagnosis_summary": "# Optimization Diagnostic Report — Round 1\n\n---\n\n## 1. Executive Summary\n\n**Single most critical issue:** The inverted-pendulum (theta) mean-angle settles at **0.8419 rad ≈ 48.2°** instead of an upright equilibrium, while ω final deviation stays at **0.5000** (full spread) with an integrated deviation of **1.3157** — meaning the system is **not stabilized** at the intended target, only locally regulated around a wrong equilibrium. Impact: ~the entire cost budget is spent on a controller that has",
+    "metrics": {
+      "state_stats": {
+        "theta": {
+          "final_mean": 0.8418701315927535,
+          "final_deviation": 0.15812986840724652,
+          "max_deviation": 0.5,
+          "integrated": 0.10525414974960239
+        },
+        "omega": {
+          "final_mean": 0.0,
+          "final_deviation": 0.5,
+          "max_deviation": 0.9723471835065092,
+          "integrated": 1.3157465686809664
+        }
+      },
+      "control_stats": {
+        "torque": {
+          "mean_usage": 3.6542003158564573,
+          "max_usage": 10.0,
+          "total_integrated": 18.189026014285567
+        }
+      },
+      "anomalies": []
+    }
+  }
+]

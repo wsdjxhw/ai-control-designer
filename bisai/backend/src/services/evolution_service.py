@@ -308,7 +308,7 @@ class EvolutionService:
                     self.file_storage.save_diagnostic(
                         self.project_id, version,
                         f"===== V{version} 演化诊断报告 =====\n"
-                        f"{cost_line}{rec.get('diagnosis_summary', '')}\n{note}",
+                        f"{cost_line}{rec.get('diagnosis', rec.get('diagnosis_summary', ''))}\n{note}",
                     )
 
                 # 🆕 不再覆盖 evolution_log.json！

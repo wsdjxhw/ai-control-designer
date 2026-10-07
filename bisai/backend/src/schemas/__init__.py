@@ -7,14 +7,6 @@ from backend.src.schemas.project import (
     ProjectResponse,
     ProjectUpdate,
 )
-from backend.src.schemas.scene_config import (
-    ControlConfig,
-    CostFunctionConfig,
-    DomainConfig,
-    SceneConfig,
-    SpaceTimeConfig,
-    StateConfig,
-)
 from backend.src.schemas.system import (
     LLMModelInfo,
     LLMModelListResponse,
@@ -29,12 +21,6 @@ __all__ = [
     "EvolutionRunResponse",
     "EvolutionStartRequest",
     "EvolutionStatusResponse",
-    "SceneConfig",
-    "CostFunctionConfig",
-    "ControlConfig",
-    "SpaceTimeConfig",
-    "StateConfig",
-    "DomainConfig",
     "SystemSettings",
     "SystemSettingsUpdate",
     "LLMModelInfo",

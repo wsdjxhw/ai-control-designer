@@ -1,11 +1,9 @@
 """UnifiedExpressionCost：统一表达式代价函数。
 
-用户只写一个表达式，框架自动处理时间积分。
+用户只写一个表达式，框架自动处理时间积分和空间积分。
 支持两种模式：
 1. integrate_over_time=True：每步计算并乘 dt（运行代价）
 2. integrate_over_time=False：只在结束时计算一次（终端代价）
-
-适用于：用户不想区分 running/terminal，只想写一个简单表达式。
 """
 
 from __future__ import annotations
@@ -17,7 +15,7 @@ from core.base.base_cost import BaseCost
 
 
 class UnifiedExpressionCost(BaseCost):
-    """统一表达式代价函数：用户只写一个表达式。
+    """统一表达式代价函数。
 
     scene_config['cost_function'] 格式示例:
     {
@@ -38,51 +36,67 @@ class UnifiedExpressionCost(BaseCost):
 
         # 符号定义
         symbols_cfg = cost_cfg.get("symbols", {})
-        state_names: list[str] = symbols_cfg.get("state", scene_config.get("state_names", []))
-        control_names: list[str] = symbols_cfg.get("control", scene_config.get("control_names", []))
+        state_names = symbols_cfg.get("state", scene_config.get("state_names", []))
+        control_names = symbols_cfg.get("control", scene_config.get("control_names", []))
 
-        self._state_syms = {name: sp.Symbol(name) for name in state_names}
-        self._control_syms = {name: sp.Symbol(name) for name in control_names}
+        self._state_names = list(state_names)
+        self._control_names = list(control_names)
+        self._state_syms = [sp.Symbol(name) for name in self._state_names]
+        self._control_syms = [sp.Symbol(name) for name in self._control_names]
 
-        # 解析统一表达式
+        # 解析统一表达式并预编译
         expr_str = cost_cfg.get("cost_expr", "")
         if expr_str:
-            # 构建 locals 字典，避免 SymPy 把 S/I/R 解析为单例
-            local_dict = {name: sp.Symbol(name) for name in state_names + control_names}
+            local_dict = {name: sp.Symbol(name) for name in self._state_names + self._control_names}
             self._expr = sp.sympify(expr_str, locals=local_dict)
+            try:
+                # 两个 lambdify：一个带 control，一个不带
+                self._expr_with_control = sp.lambdify(
+                    self._state_syms + self._control_syms,
+                    self._expr,
+                    modules=["numpy"],
+                )
+                self._expr_no_control = sp.lambdify(
+                    self._state_syms,
+                    self._expr,
+                    modules=["numpy"],
+                )
+            except Exception as e:
+                print(f"[UnifiedExpressionCost] lambdify 失败: {e}")
+                self._expr_with_control = None
+                self._expr_no_control = None
         else:
             self._expr = None
+            self._expr_with_control = None
+            self._expr_no_control = None
 
         # 是否时间积分
         self._integrate_over_time = cost_cfg.get("integrate_over_time", True)
 
         # 时间/空间步长
         temporal = scene_config.get("temporal", {})
-        self._dt: float = temporal.get("dt", 1.0)
+        dt_val = temporal.get("dt")
+        self._dt: float = float(dt_val) if dt_val is not None else 1.0
         spatial = scene_config.get("spatial", {})
-        self._dx: float = spatial.get("dx", 1.0)
+        self._dx: float = spatial.get("dx") or 1.0
 
-    def _eval_expr(self, state: np.ndarray, control: np.ndarray | None) -> float:
-        """数值化计算表达式。"""
-        if self._expr is None:
-            return 0.0
+    # ---------- 内部工具 ----------
 
-        subs_dict = {}
-        for i, name in enumerate(self._state_syms.keys()):
-            if i < len(state):
-                subs_dict[self._state_syms[name]] = float(state[i])
+    def _to_2d(self, arr: np.ndarray) -> np.ndarray:
+        arr = np.asarray(arr, dtype=float)
+        if arr.ndim == 1:
+            return arr.reshape(1, -1)
+        return arr
 
-        if control is not None:
-            for i, name in enumerate(self._control_syms.keys()):
-                if i < len(control):
-                    subs_dict[self._control_syms[name]] = float(control[i])
-        # 如果 control 为 None 且表达式包含控制符号，尝试用 0 填充
-        elif self._control_syms:
-            for name in self._control_syms.keys():
-                subs_dict[self._control_syms[name]] = 0.0
+    def _state_args(self, state: np.ndarray) -> list:
+        state = self._to_2d(state)
+        return [state[:, i] for i in range(len(self._state_syms))]
 
-        cost_val = float(self._expr.evalf(subs=subs_dict))
-        return cost_val
+    def _control_args(self, control: np.ndarray) -> list:
+        control = self._to_2d(control)
+        return [control[:, i] for i in range(len(self._control_syms))]
+
+    # ---------- BaseCost 接口 ----------
 
     def compute_running(
         self,
@@ -90,23 +104,48 @@ class UnifiedExpressionCost(BaseCost):
         control: np.ndarray,
         step: int,
     ) -> float:
-        """计算单步运行代价。
+        """单步运行代价。
 
-        仅当 integrate_over_time=True 时返回非零值。
-        代价 = eval(cost_expr) * dt
+        - integrate_over_time=True: 返回 expr * dx * dt
+        - integrate_over_time=False: 返回 0（终端代价时再算）
         """
-        if not self._integrate_over_time or self._expr is None:
+        if not self._integrate_over_time or self._expr_with_control is None:
             return 0.0
 
-        cost_val = self._eval_expr(state, control)
-        return cost_val * self._dt
+        try:
+            state_args = self._state_args(state)
+            control_args = self._control_args(control)
+            val = self._expr_with_control(*state_args, *control_args)
+            val = np.asarray(val, dtype=float)
+
+            if val.ndim == 0:
+                return float(val) * self._dt
+            else:
+                return float(np.sum(val) * self._dx) * self._dt
+
+        except Exception as e:
+            print(f"[UnifiedExpressionCost] compute_running 异常: {type(e).__name__}: {e}")
+            return 0.0
 
     def compute_terminal(self, state: np.ndarray) -> float:
-        """计算终端代价。
+        """终端代价。
 
-        仅当 integrate_over_time=False 时返回非零值。
+        - integrate_over_time=False: 返回 expr（对 state 求值，不含 control）
+        - integrate_over_time=True: 返回 0（运行代价时已经算了）
         """
-        if self._integrate_over_time or self._expr is None:
+        if self._integrate_over_time or self._expr_no_control is None:
             return 0.0
 
-        return self._eval_expr(state, None)
+        try:
+            state_args = self._state_args(state)
+            val = self._expr_no_control(*state_args)
+            val = np.asarray(val, dtype=float)
+
+            if val.ndim == 0:
+                return float(val)
+            else:
+                return float(np.sum(val) * self._dx)
+
+        except Exception as e:
+            print(f"[UnifiedExpressionCost] compute_terminal 异常: {type(e).__name__}: {e}")
+            return 0.0

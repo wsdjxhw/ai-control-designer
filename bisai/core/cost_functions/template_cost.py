@@ -89,7 +89,9 @@ class TemplateCost(BaseCost):
         # —— 空间步长 ——
         spatial = scene_config.get("spatial", {})
         self._dx: float = spatial.get("dx") or 1.0
-        self._dt: float = scene_config.get("temporal", {}).get("dt", 1.0)
+        temporal = scene_config.get("temporal", {}) or {}  # 🆕 加这一行
+        dt_val = temporal.get("dt")
+        self._dt: float = float(dt_val) if dt_val is not None else 1.0
 
     def compute_running(
         self,

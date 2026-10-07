@@ -1,4 +1,4 @@
-﻿"""演化引擎主循环。
+"""演化引擎主循环。
 
 演化引擎 (EvolutionEngine) 是整个系统的核心，负责串联：
   CMA-ES 优化 → 完整仿真 → 指标提取 → LLM 诊断 → 代码修改 → 收敛检测 → 循环
@@ -166,16 +166,24 @@ def _create_solver(scene_config: dict) -> BaseSolver:
         return SolverLoader.load(solver_type="ode_scipy", params={})
 
 def _compile_control_law(code: str) -> Callable:
-    """将控制律代码字符串编译为可调用函数。
+    import inspect
 
-    编译后的函数签名: control_law(t: float, x_grid: ndarray,
-                                   state: ndarray, params: dict) -> ndarray
-    """
     namespace: dict[str, Any] = {"np": np}
     exec(compile(code, "<control_law>", "exec"), namespace)
     func = namespace.get("control_law")
     if func is None:
         raise ValueError("控制律代码必须定义 control_law(t, x_grid, state, params) 函数")
+
+    # 🆕 检测是否接受 context 参数（有状态控制律）
+    sig = inspect.signature(func)
+    param_names = list(sig.parameters.keys())
+    # 接受 5 个参数，或第 5 个参数名为 context
+    func._accepts_context = (
+        len(param_names) >= 5
+        or "context" in param_names
+    )
+    if func._accepts_context:
+        print(f"[engine] 检测到有状态控制律（接受 context 参数）")
     return func
 
 
@@ -184,16 +192,6 @@ def _compile_control_law(code: str) -> Callable:
 # ============================================================
 
 _CMAES_DEFAULTS = {
-    "stage1_trials": 300,
-    "stage2_trials": 100,
-    "stage1_steps_ratio": 0.2,
-    "popsize_stage1": 200,
-    "popsize_stage2": 50,
-    "sigma0_stage1": 0.5,
-    "sigma0_stage2": 0.25,
-    "n_startup_trials": 300,
-    "n_top_candidates": 10,
-    "n_perturbations": 3,
     "seed": 42,
 }
 
@@ -266,8 +264,11 @@ class EvolutionEngine:
 
         # 运行时状态
         self._current_code: str = ""
+        # self._param_bounds: dict[str, tuple[float, float]] = {}
+        # self._dynamic_bounds_file = os.path.join(work_dir, "dynamic_bounds.json")
+        # 改成
         self._param_bounds: dict[str, tuple[float, float]] = {}
-        self._dynamic_bounds_file = os.path.join(work_dir, "dynamic_bounds.json")
+
 
         # 🆕 几何推断：从初始状态和 scene_config 推断模型几何
         self._geometry = self._infer_geometry(scene_config)
@@ -275,8 +276,54 @@ class EvolutionEngine:
               f"M_plus1={self._geometry['M_plus1']}, "
               f"state_dim={self._geometry['state_dim']}, "
               f"control_dim={self._geometry['control_dim']}")
+
+
+        # 🆕 从 scene_config 读"强制状态非负"开关
+        # 默认 false（允许负值，适用于 Pendulum/DCMotor 等）
+        # SIR/种群类应设 true
+        self._enforce_nonneg: bool = bool(scene_config.get("enforce_nonnegative", False))
+        print(f"[engine] 强制状态非负: {self._enforce_nonneg}")
+
         # 🆕 B-8：中断标志
         self._stop_requested: bool = False
+
+    def _clip_control(self, control: np.ndarray) -> np.ndarray:
+        """
+        对控制值做范围 clip（仅对连续控制生效）。
+
+        数据来源：scene_config['control_limits']
+        格式：{control_name: [low, high]} 或 {control_name: [离散值1, 离散值2, ...]}
+
+        - continuous：把 control 按列 clip 到 [low, high]
+        - bang_bang：不 clip（离散值校验在 BaseCost.validate_control 里做）
+        """
+        control_type = self.scene_config.get("control_type", "continuous")
+        if control_type == "bang_bang":
+            return control  # bang-bang 不 clip，让 validate_control 处理
+
+        limits = self.scene_config.get("control_limits", {})
+        if not limits:
+            return control
+
+        control_names = self.scene_config.get("control_names", [])
+        if not control_names:
+            return control
+
+        # control 是 2D: (M+1, control_dim)
+        clipped = control.copy()
+        for i, name in enumerate(control_names):
+            if name not in limits:
+                continue
+            bounds = limits[name]
+            if not isinstance(bounds, list) or len(bounds) != 2:
+                continue
+            low, high = float(bounds[0]), float(bounds[1])
+            if low > high:
+                low, high = high, low
+            if i < clipped.shape[1]:
+                clipped[:, i] = np.clip(clipped[:, i], low, high)
+
+        return clipped
 
     # ---------- 辅助方法：状态维度归一化 ----------
 
@@ -367,10 +414,8 @@ class EvolutionEngine:
 
         # 提取参数名和边界
         declared_bounds = ParamBounds.from_code(control_law_code)
-        self._load_dynamic_bounds()
-        self._param_bounds = ParamBounds.merge(
-            declared_bounds, self._dynamic_bounds
-        )
+        # 🆕 保留 merge 调用（第二个参数传空 dict）——merge 负责把声明格式转成 (low, high) 元组
+        self._param_bounds = ParamBounds.merge(declared_bounds, {})
 
         version = start_version - 1
         end_version = start_version - 1 + max_iterations
@@ -380,7 +425,7 @@ class EvolutionEngine:
             # 🆕 B-8：每轮开始前检查中断标志
             if self._stop_requested:
                 print(f"[engine] 收到中断请求，停止演化（已完成 {version - start_version + 1} 轮）")
-                self.state.status = "done"
+                self.state.status = "completed"
                 self.state.message = f"用户中断，完成 {version - start_version + 1} 轮"
                 break
 
@@ -434,10 +479,7 @@ class EvolutionEngine:
                 param_count=len(self._param_bounds),
             )
 
-            # 提取 LLM 推荐的参数边界 (简版)
-            self._update_dynamic_bounds(raw_diagnosis, best_params)
 
-            # ---- 5. LLM 代码修改 ----
             # ---- 5. LLM 代码修改 ----
             if llm_callbacks and "modify" in llm_callbacks:
                 self.state.status = "modifying"
@@ -451,9 +493,9 @@ class EvolutionEngine:
                         self._save_control_law(version + 1, new_code)
                         # 重解析参数
                         declared_bounds = ParamBounds.from_code(new_code)
-                        self._param_bounds = ParamBounds.merge(
-                            declared_bounds, self._dynamic_bounds
-                        )
+                        # 🆕 同样保留 merge 调用
+                        self._param_bounds = ParamBounds.merge(declared_bounds, {})
+
                         print(f"[engine] V{version + 1} 控制律已更新（LLM 修改成功）")
                     else:
                         # 🆕 LLM 修改失败：复制上一版代码，保证版本号连续
@@ -480,7 +522,7 @@ class EvolutionEngine:
             })
 
         # 完成
-        self.state.status = "done"
+        self.state.status = "completed"
         self.state.message = f"演化完成，共 {version} 轮"
 
         return {
@@ -494,7 +536,6 @@ class EvolutionEngine:
 
     def get_status(self) -> EvolutionState:
         return self.state
-
 
     def request_stop(self) -> None:
         """请求停止演化（下一轮开始时生效）"""
@@ -571,12 +612,23 @@ class EvolutionEngine:
         cumulative = 0.0
         step_costs: list[float] = []
 
+        # 🆕 每次 trial 创建新的 context
+        context = {}
+
         for step in range(actual_steps):
             try:
                 state_for_control = state.reshape(-1) if not self._geometry["is_pde"] else state
-                control = ctrl_func(step * dt, self.model.x_grid, state_for_control, params)
+                # 🆕 根据控制律是否接受 context 决定调用方式
+                if getattr(ctrl_func, "_accepts_context", False):
+                    control = ctrl_func(step * dt, self.model.x_grid, state_for_control, params, context)
+                else:
+                    control = ctrl_func(step * dt, self.model.x_grid, state_for_control, params)
                 control = self._to_internal_control(control)
                 control = _ensure_6_columns(control, self._geometry["control_dim"])
+
+                # 🆕 对连续控制做范围 clip（读 scene_config.control_limits）
+                control = self._clip_control(control)
+
                 # 校验 bang-bang 控制
                 if not self.cost.validate_control(control[0]):
                     return 1e10
@@ -587,7 +639,10 @@ class EvolutionEngine:
                 # 单步积分
                 state_for_solver = state.reshape(-1) if not self._geometry["is_pde"] else state
                 state = self.solver.step(self.model, state_for_solver, control, dt)
-                state = self._to_internal(np.maximum(state, 0.0))
+                if self._enforce_nonneg:
+                    state = self._to_internal(np.maximum(state, 0.0))
+                else:
+                    state = self._to_internal(state)
                 # Optuna 剪枝
                 if trial is not None and step > 0 and step % 5000 == 0:
                     avg = cumulative / (step + 1)
@@ -607,11 +662,15 @@ class EvolutionEngine:
                     traceback.print_exc()
                 return 1e10
 
-        # 终端代价
+        # 🆕 根据 integration_method 做数值积分
+        integration_method = self.scene_config.get("integration_method", "rectangular")
+
         if actual_steps == N:
-            total = cumulative + self.cost.compute_terminal(state)
+            # 完整仿真：按选定方法积分
+            integral = self._integrate_costs(step_costs, integration_method)
+            total = integral + self.cost.compute_terminal(state)
         else:
-            # 外推
+            # 外推：用矩形法则的 cumulative 作为基准
             recent = step_costs[-min(20, len(step_costs)):]
             avg_recent = float(np.mean(recent)) if recent else 0.0
             remaining = N - actual_steps
@@ -621,6 +680,47 @@ class EvolutionEngine:
             total = (cumulative + projected + terminal) * roughness
 
         return float(total)
+
+    def _integrate_costs(self, step_costs: list[float], method: str) -> float:
+        """
+        对每步的代价做数值积分。
+
+        Args:
+            step_costs: 每步的代价列表，每项已经是 f(t_i) * dt
+            method: "rectangular" | "trapezoidal" | "simpson"
+
+        Returns:
+            积分值（已含 dt）
+        """
+        import numpy as np
+
+        if not step_costs:
+            return 0.0
+
+        arr = np.asarray(step_costs, dtype=float)
+        n = len(arr)
+
+        if method == "trapezoidal":
+            if n < 2:
+                return float(arr.sum())
+            # 梯形法则: (a0 + 2*a1 + 2*a2 + ... + 2*a_{n-1} + a_n) / 2
+            return float((arr[0] + arr[-1]) / 2.0 + arr[1:-1].sum())
+
+        if method == "simpson":
+            if n < 3 or n % 2 == 0:
+                # Simpson 需要奇数个点，否则退化到梯形
+                if n < 2:
+                    return float(arr.sum())
+                return float((arr[0] + arr[-1]) / 2.0 + arr[1:-1].sum())
+            # Simpson 法则: (a0 + 4*a1 + 2*a2 + 4*a3 + ... + a_n) / 3
+            return float(
+                (arr[0] + arr[-1]
+                 + 4.0 * arr[1:-1:2].sum()
+                 + 2.0 * arr[2:-2:2].sum()) / 3.0
+            )
+
+        # 默认：矩形法则（原来的行为）
+        return float(arr.sum())
 
     def _simulate(
         self,
@@ -644,17 +744,36 @@ class EvolutionEngine:
         idx = 0
         t_arr[0] = 0.0
         s_hist[0] = state
+
+        # 🆕 创建一次 context
+        context = {}
+
+        # 初始化 c0（兼容有/无 context 两种控制律）
         state_for_control = state.reshape(-1) if not self._geometry["is_pde"] else state
-        c_hist[0] = self._to_internal_control(ctrl_func(0.0, self.model.x_grid, state_for_control, params))
+        if getattr(ctrl_func, "_accepts_context", False):
+            c0 = self._to_internal_control(ctrl_func(0.0, self.model.x_grid, state_for_control, params, context))
+        else:
+            c0 = self._to_internal_control(ctrl_func(0.0, self.model.x_grid, state_for_control, params))
+        c0 = _ensure_6_columns(c0, c_dim)
+        c0 = self._clip_control(c0)
+        c_hist[0] = c0
 
         for step in range(1, N + 1):
             t = step * dt
             state_for_control = state.reshape(-1) if not self._geometry["is_pde"] else state
-            control = self._to_internal_control(ctrl_func(t, self.model.x_grid, state_for_control, params))
+            if getattr(ctrl_func, "_accepts_context", False):
+                raw_control = ctrl_func(t, self.model.x_grid, state_for_control, params, context)
+            else:
+                raw_control = ctrl_func(t, self.model.x_grid, state_for_control, params)
+            control = self._to_internal_control(raw_control)
             control = _ensure_6_columns(control, c_dim)
+            control = self._clip_control(control)
             state_for_solver = state.reshape(-1) if not self._geometry["is_pde"] else state
             state = self.solver.step(self.model, state_for_solver, control, dt)
-            state = self._to_internal(np.maximum(state, 0.0))
+            if self._enforce_nonneg:
+                state = self._to_internal(np.maximum(state, 0.0))
+            else:
+                state = self._to_internal(state)
             if step % save_interval == 0 or step == N:
                 idx += 1
                 t_arr[idx] = t
@@ -663,20 +782,9 @@ class EvolutionEngine:
 
         return t_arr[: idx + 1], s_hist[: idx + 1], c_hist[: idx + 1]
 
-    def _load_dynamic_bounds(self) -> None:
-        self._dynamic_bounds: dict[str, list[float]] = {}
-        if os.path.exists(self._dynamic_bounds_file):
-            try:
-                with open(self._dynamic_bounds_file, "r", encoding="utf-8") as f:
-                    self._dynamic_bounds = json.load(f)
-            except (json.JSONDecodeError, IOError):
-                self._dynamic_bounds = {}
 
-    def _update_dynamic_bounds(
-        self, diagnosis: str, params: dict
-    ) -> None:
-        """简版：暂不自动更新，保留接口供后续 LLM 集成。"""
-        pass
+
+
 
     def _save_control_law(self, version: int, code: str) -> None:
         """保存控制律到 work_dir/control_v{version}.py"""
@@ -701,7 +809,7 @@ class EvolutionEngine:
             print(f"[engine] 保存 best_params_v{version}.json 失败: {e}")
 
     def _error_result(self, msg: str) -> dict[str, Any]:
-        self.state.status = "error"
+        self.state.status = "failed"
         self.state.error = msg
         return {
             "success": False,

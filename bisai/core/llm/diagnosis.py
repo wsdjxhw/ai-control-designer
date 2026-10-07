@@ -60,7 +60,7 @@ the current version metrics.
     last_error = None
     for attempt in range(3):
         try:
-            response_content = llm.invoke(prompt, max_tokens=2000)
+            response_content = llm.invoke(prompt, max_tokens=20000)
             if response_content and len(response_content.strip()) > 0:
                 return validate_diagnosis_report(response_content, anomalies)
         except Exception as e:

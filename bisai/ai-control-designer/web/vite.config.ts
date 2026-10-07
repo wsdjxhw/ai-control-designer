@@ -11,6 +11,7 @@ export default defineConfig({
     },
   },
   build: {
+    // ✅ 两级上溯：ai-control-designer/web/ → bisai/backend/static
     outDir: '../../backend/static',
     emptyOutDir: true,
   },
@@ -18,7 +19,8 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',  // ← 改这里：duanlou
+        // 与 start.bat 一致
+        target: 'http://localhost:8001',
         changeOrigin: true,
       }
     }

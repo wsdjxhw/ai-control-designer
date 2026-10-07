@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
-import { searchStrategies, deleteStrategy, RagSearchResult } from '@/api/client';
+import React, { useState, useEffect } from 'react';
+import { searchStrategies, deleteStrategy, listStrategies, RagSearchResult } from '@/api/client';
 
 const RagSearchPanel: React.FC = () => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<RagSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
-  const [searched, setSearched] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [mode, setMode] = useState<'browse' | 'search'>('browse');
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // 展开/收起状态
@@ -28,10 +29,31 @@ const RagSearchPanel: React.FC = () => {
     });
   };
 
+  // 🆕 加载全部策略（浏览模式）
+  const loadAllStrategies = async () => {
+    setInitialLoading(true);
+    try {
+      const res = await listStrategies(200);
+      setResults(res.results || []);
+      setMode('browse');
+    } catch (err: any) {
+      console.error('加载策略库失败', err);
+      setResults([]);
+    } finally {
+      setInitialLoading(false);
+    }
+  };
+
+  // 🆕 首次挂载 → 拉全量
+  useEffect(() => {
+    loadAllStrategies();
+  }, []);
+
+  // 搜索
   const handleSearch = async () => {
     if (!query.trim() || loading) return;
     setLoading(true);
-    setSearched(true);
+    setMode('search');
     setExpandedCode(new Set());
     setExpandedParams(new Set());
     try {
@@ -48,13 +70,20 @@ const RagSearchPanel: React.FC = () => {
     }
   };
 
+  // 🆕 清空搜索 → 回到浏览模式
+  const handleClearSearch = () => {
+    setQuery('');
+    setExpandedCode(new Set());
+    setExpandedParams(new Set());
+    loadAllStrategies();
+  };
+
   const handleDelete = async (id: string, idx: number) => {
     if (!confirm(`确定要从策略库删除「${id}」吗？\n此操作不可恢复！`)) return;
     setDeletingId(id);
     try {
       const res = await deleteStrategy(id);
       if (res.success) {
-        // 从当前结果里移除
         setResults(prev => prev.filter((_, i) => i !== idx));
       } else {
         alert('删除失败: ' + res.message);
@@ -94,9 +123,50 @@ const RagSearchPanel: React.FC = () => {
         >
           {loading ? '⏳ 检索中...' : '🔍 检索'}
         </button>
+        {/* 🆕 清空按钮 */}
+        {mode === 'search' && (
+          <button
+            onClick={handleClearSearch}
+            disabled={loading}
+            className="px-4 py-2.5 bg-[#1a2d4a] hover:bg-[#2a3f5a] text-gray-300 rounded-xl border border-[#2a3f5a] transition whitespace-nowrap"
+            title="清空搜索，返回全部策略"
+          >
+            ✕ 清空
+          </button>
+        )}
       </div>
 
-      {/* 加载中 */}
+      {/* 🆕 状态栏 */}
+      <div className="flex items-center justify-between text-sm">
+        <div className="flex items-center gap-2">
+          {mode === 'browse' ? (
+            <span className="text-gray-400 font-mono">
+              📚 策略库全部策略
+              <span className="ml-2 text-blue-400 font-bold">{results.length}</span>
+              <span className="text-gray-500">条</span>
+            </span>
+          ) : (
+            <span className="text-gray-400 font-mono">
+              🔍 检索「<span className="text-blue-400">{query}</span>」
+              <span className="ml-2 text-blue-400 font-bold">{results.length}</span>
+              <span className="text-gray-500">条命中</span>
+            </span>
+          )}
+        </div>
+        {initialLoading && (
+          <span className="text-xs text-gray-500 font-mono">加载中...</span>
+        )}
+      </div>
+
+      {/* 首次加载状态 */}
+      {initialLoading && (
+        <div className="text-center py-8 text-blue-400 font-mono">
+          <div className="inline-block w-8 h-8 border-2 border-blue-500/20 border-t-blue-500 rounded-full animate-spin mb-2"></div>
+          <p>正在加载策略库...</p>
+        </div>
+      )}
+
+      {/* 搜索加载中 */}
       {loading && (
         <div className="text-center py-8 text-blue-400 font-mono">
           <div className="inline-block w-8 h-8 border-2 border-blue-500/20 border-t-blue-500 rounded-full animate-spin mb-2"></div>
@@ -106,22 +176,23 @@ const RagSearchPanel: React.FC = () => {
       )}
 
       {/* 空结果 */}
-      {!loading && searched && results.length === 0 && (
+      {!initialLoading && !loading && results.length === 0 && (
         <div className="text-center py-12 glass-card">
-          <div className="text-4xl mb-3">📭</div>
-          <p className="text-gray-400">未找到匹配的策略</p>
+          <div className="text-4xl mb-3">{mode === 'browse' ? '📭' : '🔍'}</div>
+          <p className="text-gray-400">
+            {mode === 'browse' ? '策略库暂无数据' : '未找到匹配的策略'}
+          </p>
           <p className="text-xs text-gray-500 mt-2">
-            试试更具体的查询，或先在项目里"存入 RAG"
+            {mode === 'browse'
+              ? '在项目演化过程中点"存入 RAG"，即可积累策略'
+              : '试试更具体的查询，或点"清空"返回全部策略'}
           </p>
         </div>
       )}
 
       {/* 结果列表 */}
-      {!loading && results.length > 0 && (
+      {!initialLoading && !loading && results.length > 0 && (
         <div className="space-y-3">
-          <p className="text-sm text-gray-400 font-mono">
-            共找到 <span className="text-blue-400 font-bold">{results.length}</span> 条相似策略
-          </p>
           {results.map((r, idx) => {
             const codeExpanded = expandedCode.has(idx);
             const paramsExpanded = expandedParams.has(idx);
@@ -136,9 +207,12 @@ const RagSearchPanel: React.FC = () => {
                 {/* 头部信息 */}
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="badge-tech-blue text-xs">
-                      {(r.similarity * 100).toFixed(1)}% 相似
-                    </span>
+                    {/* 🆕 浏览模式下不显示相似度（无意义） */}
+                    {mode === 'search' && typeof r.similarity === 'number' && (
+                      <span className="badge-tech-blue text-xs">
+                        {(r.similarity * 100).toFixed(1)}% 相似
+                      </span>
+                    )}
                     <span className="badge-tech-purple text-xs">
                       领域: {r.metadata?.domain || '未知'}
                     </span>
@@ -258,17 +332,6 @@ const RagSearchPanel: React.FC = () => {
               </div>
             );
           })}
-        </div>
-      )}
-
-      {/* 初始状态 */}
-      {!searched && !loading && (
-        <div className="text-center py-12 text-gray-500 font-mono">
-          <p className="text-4xl mb-3">📚</p>
-          <p>输入查询关键词开始检索</p>
-          <p className="text-xs mt-2">
-            策略库中的数据来自项目演化过程中"存入 RAG"的策略
-          </p>
         </div>
       )}
     </div>
